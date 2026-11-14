@@ -18,6 +18,7 @@ import {
 } from './data.js';
 import { SoundEngine } from './audio.js';
 import { SearchController } from './search.js';
+import { SoundOfChangeEngine } from './sound-of-change.js';
 
 // Free Public Basemaps: Physical Elevation-Colored Topography (No API Keys)
 const BASEMAP_TILES = {
@@ -86,6 +87,10 @@ class App {
     this.hudStatus = document.getElementById('hud-status');
     this.infocardContainer = document.getElementById('rain-infocard');
 
+    // Experience views ('rain' | 'sound-of-change')
+    this.currentView = 'rain';
+    this.soundOfChange = new SoundOfChangeEngine(this.sound.ctx);
+
     this.initTheme();
     this.initMap();
     this.initAudioMixer();
@@ -95,6 +100,8 @@ class App {
     this.initInfocardHover();
     this.initStarsBackground();
     this.initMobileUI();
+    this.initSoundOfChange();
+    this.initNavigation();
     this.loadGlobalPrecipitationBuffer();
   }
 
@@ -215,7 +222,7 @@ class App {
               'raster-fade-duration': 250,
               'raster-brightness-max': isDark ? 0.88 : 1.0,
               'raster-contrast': isDark ? 0.22 : 0.05,
-              'raster-saturation': isDark ? -0.1 : 0.05
+              'raster-saturation': isDark ? -0.45 : -0.20
             }
           },
           // Shaded Relief / Hillshade Layer to accentuate the 3D bumpy peaks
@@ -245,7 +252,7 @@ class App {
               'raster-resampling': 'linear'
             }
           },
-          // 2. Hovering Atmospheric Storm Cloud Deck
+          // 2. Hovering Atmospheric Storm Cloud Deck (Vivid NASA IMERG Rain Visualization)
           {
             id: 'cloud-deck-layer',
             type: 'raster',
@@ -253,10 +260,10 @@ class App {
             paint: {
               'raster-opacity': 0.88,
               'raster-fade-duration': 200,
-              'raster-brightness-min': 0.18,
+              'raster-brightness-min': 0.05,
               'raster-brightness-max': 1.0,
-              'raster-contrast': 0.65,
-              'raster-saturation': -0.75,
+              'raster-contrast': 0.15,
+              'raster-saturation': 0.20,
               'raster-resampling': 'linear'
             }
           }
@@ -367,6 +374,11 @@ class App {
       if (this.map.getLayer('base-layer')) {
         this.map.setPaintProperty('base-layer', 'raster-brightness-max', isDark ? 0.88 : 1.0);
         this.map.setPaintProperty('base-layer', 'raster-contrast', isDark ? 0.22 : 0.05);
+        this.map.setPaintProperty('base-layer', 'raster-saturation', isDark ? -0.45 : -0.20);
+      }
+      if (this.map.getLayer('cloud-deck-layer')) {
+        this.map.setPaintProperty('cloud-deck-layer', 'raster-saturation', 0.20);
+        this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.15);
       }
       if (this.map.getLayer('hillshade-layer')) {
         this.map.setPaintProperty('hillshade-layer', 'hillshade-shadow-color', isDark ? '#02050e' : '#475569');
@@ -525,7 +537,7 @@ class App {
   getPixelRainRate(px, py) {
     const idx = (py * 512 + px) * 4;
     const a = this.pixelData[idx + 3];
-    if (a < 40) return 0; // Ignore transparent or insignificant background pixels
+    if (a < 80) return 0; // Ignore transparent or insignificant background pixels
 
     const r = this.pixelData[idx];
     const g = this.pixelData[idx + 1];
@@ -554,8 +566,8 @@ class App {
         if (dist === 0) break;
       }
     }
-    // Strict Euclidean distance cutoff: if pixel color is not within 45 RGB units of palette, it's NOT rain!
-    if (bestDist > 2200) return 0;
+    // Strict Euclidean distance cutoff: if pixel color is not within calibrated RGB distance of NASA IMERG palette, it's NOT rain!
+    if (bestDist > 650) return 0;
     return bestVal;
   }
 
@@ -853,6 +865,14 @@ class App {
       solutionsEl.innerHTML = noiseData.solutions.map((s) => `<li>${s}</li>`).join('');
     }
 
+    const socBtn = document.getElementById('modal-btn-open-soc');
+    if (socBtn) {
+      socBtn.onclick = () => {
+        modal.classList.remove('open');
+        this.switchExperience('sound-of-change');
+      };
+    }
+
     modal.classList.add('open');
   }
 
@@ -1056,7 +1076,20 @@ class App {
     if (!listContainer) return;
 
     const cities = getLeaderboardCities();
-    listContainer.innerHTML = '';
+    listContainer.innerHTML = `
+      <div class="leaderboard-soc-banner" id="leaderboard-soc-banner" style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(52, 211, 153, 0.15)); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
+        <div>
+          <div style="font-weight: 750; color: var(--text-main); font-size: 13px;">🏙️ Explore The Sound of Change (Manhattan)</div>
+          <div style="font-size: 11px; color: var(--text-sub); margin-top: 2px;">Interactive video simulator: Test 20 urban policies & watch the city quiet down.</div>
+        </div>
+        <button class="soc-btn soc-btn-primary" style="white-space: nowrap; font-size: 11.5px; padding: 6px 12px;">Simulate →</button>
+      </div>
+    `;
+
+    document.getElementById('leaderboard-soc-banner')?.addEventListener('click', () => {
+      modal?.classList.remove('open');
+      this.switchExperience('sound-of-change');
+    });
 
     cities.forEach((city) => {
       const item = document.createElement('div');
@@ -1294,10 +1327,19 @@ class App {
         if (document.activeElement !== searchInput) {
           this.toggleUiVisibility();
         }
-      } else if (e.key === ' ' && document.activeElement !== searchInput) {
+      } else if (e.key === ' ' && document.activeElement !== searchInput && document.activeElement.tagName !== 'BUTTON') {
         e.preventDefault();
-        this.togglePlayback();
+        if (this.currentView === 'sound-of-change') {
+          this.soundOfChange?.toggleAudio();
+        } else {
+          this.togglePlayback();
+        }
+      } else if ((e.key === 'c' || e.key === 'C') && document.activeElement !== searchInput) {
+        this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');
       } else if ((e.key === 's' || e.key === 'S') && document.activeElement !== searchInput) {
+        if (this.currentView === 'sound-of-change') {
+          this.switchExperience('rain');
+        }
         this.flyToHeaviestRainArea();
       }
     });
@@ -1555,6 +1597,111 @@ class App {
     noiseModal?.addEventListener('click', (e) => {
       if (e.target === noiseModal) noiseModal.classList.remove('open');
     });
+  }
+
+  // ==========================================
+  // NAVIGATION & EXPERIENCE SWITCHER
+  // ==========================================
+
+  initNavigation() {
+    const btnSoc = document.getElementById('btn-sound-of-change');
+    const brand = document.getElementById('btn-brand');
+
+    btnSoc?.addEventListener('click', () => {
+      this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');
+    });
+    brand?.addEventListener('click', () => {
+      this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');
+    });
+
+    // Hash routing
+    const handleHash = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#sound-of-change' || hash === '#change' || hash === '#interventions') {
+        this.switchExperience('sound-of-change', false);
+      } else if (hash === '#rain' || hash === '#globe') {
+        this.switchExperience('rain', false);
+      } else if (hash === '#about') {
+        document.getElementById('info-modal')?.classList.add('open');
+      }
+    };
+
+    window.addEventListener('hashchange', handleHash);
+    handleHash();
+  }
+
+  switchExperience(viewName, updateHash = true) {
+    if (this.currentView === viewName && !updateHash) return;
+    this.currentView = viewName;
+
+    const btnSoc = document.getElementById('btn-sound-of-change');
+    const socView = document.getElementById('sound-of-change-view');
+    const rainCapsules = [
+      document.getElementById('hud-top-center'),
+      document.getElementById('hud-bottom-left'),
+      document.getElementById('hud-bottom-right'),
+      document.getElementById('cursor-tracker')
+    ];
+
+    if (viewName === 'sound-of-change') {
+      // Switch active button styling
+      btnSoc?.classList.add('active');
+
+      // Make sure AudioContext is initialized from user action
+      if (!this.sound.ctx) {
+        this.sound.init();
+      }
+
+      // Hide rain-specific UI capsules
+      rainCapsules.forEach(el => {
+        if (el) el.style.display = 'none';
+      });
+
+      // Show Sound of Change view
+      socView?.classList.add('active');
+
+      // Temporarily lower or pause rain audio
+      if (this.isListening) {
+        this.sound.updateRain(0, this.sound.currentZoom, false);
+      }
+
+      // Start videos
+      this.soundOfChange?.initVideo();
+
+      if (updateHash) {
+        window.history.replaceState(null, '', '#sound-of-change');
+      }
+    } else {
+      // Switch to Global Rain
+      btnSoc?.classList.remove('active');
+
+      // Hide Sound of Change view
+      socView?.classList.remove('active');
+
+      // Restore rain UI capsules
+      rainCapsules.forEach(el => {
+        if (el) el.style.display = '';
+      });
+
+      // Pause Sound of Change audio
+      this.soundOfChange?.pauseAudio();
+
+      // Resume rain audio if user was in listening state
+      if (this.isListening && this.listeningTarget) {
+        this.sound.updateRain(this.listeningTarget.rate, this.map ? this.map.getZoom() : 2.5, true);
+        this.sound.updateAmbience(this.currentEnv, true);
+      }
+
+      if (updateHash) {
+        window.history.replaceState(null, '', '#rain');
+      }
+    }
+  }
+
+  initSoundOfChange() {
+    const socContainer = document.getElementById('sound-of-change-view');
+    if (!socContainer) return;
+    this.soundOfChange.mount(socContainer, this.sound.ctx);
   }
 
   // ==========================================

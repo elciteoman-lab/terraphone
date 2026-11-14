@@ -1,10 +1,110 @@
-# Terraphone 🌍🌧️⚡
+# Terraphone 🌍🌧️🏙️⚡
 
-> **NASA Space Apps Challenge** · Live Global Rain, Thunder & Atmospheric Sound Simulator  
-> Powered by **NASA Scientific Visualization Studio (SVS) Entry 5650** & **NASA GPM IMERG**  
+> **NASA Space Apps Challenge 2026** · Global Rain & The Sound of Change  
+> Powered by **NASA Scientific Visualization Studio (SVS Entry 5650)**, **NASA GPM IMERG**, **NASA Soundscapes to Landscapes (S2L)**, **UNEP Frontiers**, and **WHO Environmental Guidelines**  
 > 🔗 **Live Demo**: [https://vylt-gh.github.io/terraphone/](https://vylt-gh.github.io/terraphone/)
 
-`Terraphone` is an immersive global rain, thunder, and atmospheric sound simulator designed with a sleek, minimalist, out-of-your-way UI inspired by **slowroads.io**. Explore the Earth as a tactile 3D bumpy globe, discover near-real-time global storm systems, and listen to authentic multi-layered soundscapes combining live rain droplet physics, convective NASA thunder rolls, and location-dependent habitat ambience (urban traffic, rural insects, jungle wildlife, and ocean swells).
+**Terraphone** explores how our planet sounds. Earth is constantly making music — our mission is to allow people to explore it, listen to it, and understand how human decisions and urban planning policies transform its acoustic soundscape.
+
+The project connects two interactive scientific experiences:
+1. **🌧️ Global Rain**: Explore worldwide precipitation data from NASA satellites and listen to its live sonification across a 3D bumpy globe.
+2. **🏙️ The Sound of Change**: Explore urban noise pollution in New York City (Manhattan) through cinematic **Google Flow 1080p footage**, and simulate how 20 urban policies and environmental interventions can transform a chaotic, high-noise city into a quiet, healthy sanctuary.
+
+---
+
+## ✨ Key Experiences
+
+### 1. 🏙️ The Sound of Change (Urban Acoustic Simulation)
+- 🎬 **Cinematic Google Flow 1080p Video Integration**:
+  - Live urban video background utilizing high-definition Google Flow footage of Manhattan streetscapes.
+  - Smooth dynamic crossfade between high-density chaotic traffic (`noisy-city.mp4`) and calm pedestrianized boulevards (`quiet-city.mp4`).
+  - Interactive **Before / After Split Slider**: Drag across the screen in real-time to compare the baseline noisy city against the quieted city.
+- 🎛️ **Layered 5-Channel Web Audio Engine**:
+  - Replaces monolithic audio with 5 independent real-time channels:
+    1. **Traffic**: Engine rumble, tire-pavement friction, and passing cars.
+    2. **Horns**: Periodic NYC taxi and delivery horn honks.
+    3. **Construction**: Pneumatic jackhammer pulses, drilling, and metallic impacts.
+    4. **Industry**: Deep 60Hz/120Hz transformer hum and commercial HVAC chiller fans.
+    5. **Crowd & Entertainment**: Pedestrian footsteps, cafe chatter, and street murmur.
+    6. **Nature**: Melodic birdsong and wind through trees (emerges as urban noise subsides).
+- 📐 **Scientifically Responsible Logarithmic Noise Index**:
+  - Displays a **Simulated Noise Index (0–100)** with dBA equivalent acoustic pressure:
+    $$L_{\text{total}} = 10 \cdot \log_{10}\left( \sum 10^{L_i / 10} \right)$$
+  - Calibrated from baseline Manhattan (**Index 88**, ~85 dBA) down to a calm urban park (**Index 48**, ~72 dBA).
+  - WHO Environmental Noise Guideline marker (53 dBA daytime threshold).
+- 🚶🏠 **Indoor vs. Outdoor Listening Perspectives**:
+  - **Outdoor Sidewalk**: Direct acoustic exposure to street canyons and traffic.
+  - **Indoor Apartment**: Realistic acoustic transmission loss. Mandatory building insulation provides +26 dB attenuation through an acoustic lowpass biquad filter (corner frequency 260 Hz), demonstrating that facade insulation primarily creates an indoor sanctuary rather than reducing outdoor street noise.
+- 📢 **4 Comprehensive Intervention Categories (20 Policies)**:
+  - **Transportation & Traffic**: Electric public transit, low-noise asphalt, 30 km/h speed management, vehicle routing, and smart acoustic camera horn enforcement.
+  - **Architecture & Sound Insulation**: Mandatory STC-45 building insulation, sound-scattering facade architecture, transparent noise barriers, and green building standards.
+  - **Urban Planning & Source Control**: Heavy industry zoning relocation, continuous vegetative green belts, entertainment venue sound locks, commercial HVAC inspections, construction hour curfews, and quiet delivery logistics.
+  - **Public Awareness & Health**: Community quiet hours, anti-honking campaigns, and responsible headphone habits (WHO 60/60 rule protecting personal hearing health without artificially skewing ambient outdoor metrics).
+
+---
+
+### 2. 🌧️ Global Rain (3D Planetary Sonification)
+- ☁️ **Hovering Atmospheric Storm Cloud Deck & Ground Shadows**:
+  - Live NASA GPM IMERG rainfall draped as volumetric clouds with terrain shadows over an elevation colormap globe.
+- ⚡ **NASA Convective Thunder & Lightning Integration**:
+  - Real-time thunder synthesis triggered by convective storm cores (>12 mm/hr), synchronized with atmospheric lightning illumination.
+- 🏙️🦗🦜🌊 **Location-Dependent Habitat Ambience**:
+  - Seamless crossfading between 4 distinct acoustic habitats:
+    - 🏙️ **Urban Ambience**: Wet city streets, passing tire hiss, and metropolitan hum.
+    - 🦗 **Rural Ambience**: Countryside night insects, chorus frogs, and gentle breezes.
+    - 🦜 **Rainforest Canopy Wildlife**: Amazon & Congo basin biodiversity and canopy birds.
+    - 🌊 **Ocean Swells & Surf**: Pelagic oceanic tidal swells and coastal surf.
+- 🏆 **Global Urban Noise Leaderboard (UNEP & WHO)**:
+  - Ranked acoustic profiles for ~50 major global cities, with direct links into The Sound of Change simulator.
+- 🧠 **Interactive Rain & Geo Quiz**:
+  - Flight camera (`flyTo`) transports users across extreme precipitation hotspots on Earth.
+- ⚡ **Fly to Heaviest Rain Area on Earth (Hotkey `S`)**:
+  - Scans active NASA GPM 512×512 precipitation grid for the planet's highest storm rate.
+
+---
+
+## ⌨️ Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `C` | Switch between **Global Rain** and **The Sound of Change** |
+| `Space` | Play / Pause audio soundscape in active experience |
+| `/` | Focus global searchbar |
+| `S` | Find & Fly to Heaviest Rain Area on Earth |
+| `L` | Toggle procedural Lo-Fi chillhop mode |
+| `H` | Toggle Zen View (hide/show all HUD capsules) |
+| `Right-Click + Drag` | Tilt and rotate 3D bumpy globe |
+| `Scroll Wheel` | Zoom in / out (adjusts acoustic distance) |
+
+---
+
+## 🚀 Running Locally
+
+The project uses modern native web standards (ES Modules, Web Audio API, HTML5 Video, CSS Grid) with zero build steps or bundlers required:
+
+```bash
+# Start a local HTTP server
+python3 -m http.server 8080
+
+# Open in your browser
+http://localhost:8080
+```
+
+To jump directly into an experience via URL hash:
+- **Global Rain**: `http://localhost:8080/#rain`
+- **The Sound of Change**: `http://localhost:8080/#sound-of-change`
+
+---
+
+## 🛰️ Scientific Attribution & References
+
+- **NASA Scientific Visualization Studio (SVS)**: Entry 5650 *"Near Real-Time Global Precipitation from the GPM Constellation"* (Alex Kekesi & Dr. George Huffman).
+- **NASA Earthdata / GIBS**: Global Precipitation Measurement (GPM) IMERG 30-Minute Precipitation Rate.
+- **NASA TRMM / ISS LIS**: Lightning Imaging Sensor Flash Density & Convective Storm Core Dynamics.
+- **United Nations Environment Programme (UNEP)**: Frontiers 2022 Report *"Noise, Blazes and Mismatches: Emerging Issues of Environmental Concern"*.
+- **World Health Organization (WHO)**: *Environmental Noise Guidelines for the European Region* (53 dBA $L_{den}$ traffic guideline).
+- **Google Flow**: Cinematic high-definition urban footage of Manhattan, New York.
+- **AWS Open Data & Esri**: Mapzen Terrarium Global Elevation DEM & World Physical Topography.
 
 ---
 

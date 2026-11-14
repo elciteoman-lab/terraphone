@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Terraphone — Live Global Rain, Thunder & Atmospheric Sound Simulator</title>
-  <meta name="description" content="Terraphone: Immersive global rain, thunder and atmospheric sound simulator powered by NASA GPM IMERG and NASA SVS 5650. Explore live precipitation draped over a 3D bumpy globe.">
+  <title>Terraphone — Live Global Rain, Thunder & Sound of Change | NASA Space Apps Challenge</title>
+  <meta name="description" content="Terraphone: Immersive global rain, thunder and atmospheric sound simulator powered by NASA GPM IMERG and NASA SVS 5650, plus The Sound of Change urban noise intervention simulator.">
 
   <!-- MapLibre GL v5 CDN -->
   <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/dist/maplibre-gl.css" rel="stylesheet">
@@ -27,8 +27,9 @@
     });
   </script>
 
-  <!-- Application Stylesheet -->
+  <!-- Application Stylesheets -->
   <link href="css/style.css" rel="stylesheet">
+  <link href="css/sound-of-change.css" rel="stylesheet">
 </head>
 <body>
 
@@ -43,7 +44,7 @@
        TOP LEFT: BRAND & NASA SVS 5650 CAPSULE
        ========================================== -->
   <header class="hud-capsule" id="hud-top-left">
-    <div class="brand-wrapper" id="btn-brand">
+    <div class="brand-wrapper" id="btn-brand" title="Terraphone — NASA Space Apps Challenge">
       <span class="brand-title">Terra<span>phone</span></span>
     </div>
     <a href="https://svs.gsfc.nasa.gov/5650" target="_blank" rel="noopener noreferrer" class="badge-gpm" title="NASA SVS 5650: Near Real-Time Global Precipitation from the GPM Constellation">
@@ -100,6 +101,15 @@
         <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
       </svg>
       <span>Noise Rank</span>
+    </button>
+
+    <!-- The Sound of Change Urban Simulation Button (NASA S2L) -->
+    <button id="btn-sound-of-change" class="hud-btn" title="The Sound of Change: Urban Noise & Interventions (Hotkey C)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+      </svg>
+      <span>Sound of Change</span>
     </button>
 
     <!-- Mobile Mixer Drawer Toggle Button -->
@@ -312,6 +322,11 @@
   </button>
 
   <!-- ==========================================
+       THE SOUND OF CHANGE: URBAN NOISE & INTERVENTIONS
+       ========================================== -->
+  <div id="sound-of-change-view" class="sound-of-change-view"></div>
+
+  <!-- ==========================================
        INFO & NASA SVS 5650 DIALOG MODAL
        ========================================== -->
   <div id="info-modal" class="modal-backdrop">
@@ -325,55 +340,56 @@
 
       <div class="modal-content">
         <div class="modal-badge-group">
-          <span class="sugg-tag">NASA Space Apps Challenge</span>
+          <span class="sugg-tag">NASA Space Apps Challenge 2026</span>
           <span class="sugg-tag">NASA SVS ID 5650</span>
           <span class="sugg-tag">GPM IMERG V07B</span>
+          <span class="sugg-tag">UNEP Frontiers Report</span>
+          <span class="sugg-tag">WHO Noise Guidelines</span>
           <span class="sugg-tag">Web Audio API</span>
         </div>
 
         <p>
-          <strong>Terraphone</strong> is an interactive global rain sound simulator designed for the 
-          <strong>NASA Space Apps Challenge</strong>. It transforms near real-time global precipitation data 
-          from NASA's <strong>Global Precipitation Measurement (GPM)</strong> constellation into high-fidelity procedural 
-          soundscapes draped across a tactile 3D bumpy globe.
+          <strong>Terraphone</strong> is an interactive scientific experience created for the 
+          <strong>NASA Space Apps Challenge</strong>. Earth is constantly making music — our mission is to explore 
+          how our planet sounds, how planetary rainfall patterns unfold, and how human urban-planning decisions change our acoustic soundscape.
         </p>
 
+        <h3 style="font-size: 14px; margin-top: 14px; color: var(--accent);">🌧️ Experience 1: Global Rain</h3>
         <p>
-          <strong>Hovering Storm Cloud Deck & NASA Thunder:</strong><br>
-          Rainfall data is visualized as volumetric atmospheric clouds hovering over Earth's topography, casting ground shadows 
-          onto the terrain beneath. Convective storms trigger deep rolling thunder synchronized with NASA Lightning Imaging 
-          Sensor (LIS) flash dynamics and atmospheric lightning flashes.
+          Explore worldwide precipitation data from NASA's <strong>Global Precipitation Measurement (GPM)</strong> constellation 
+          draped over a tactile 3D bumpy globe. Live precipitation data (NASA SVS Entry 5650) drives procedural rain droplet physics, 
+          convective NASA thunder rumbles, and location-dependent habitat crossfading (urban, rural, rainforest, ocean).
         </p>
 
+        <h3 style="font-size: 14px; margin-top: 14px; color: #34d399;">🏙️ Experience 2: The Sound of Change</h3>
         <p>
-          <strong>Location-Dependent Habitat Ambience:</strong><br>
-          Depending on where on Earth you explore, Terraphone crossfades between authentic acoustic habitats:
-          dense urban traffic & city rain, rural night insects and frogs, equatorial rainforest wildlife and canopy birds, or 
-          pelagic ocean swells and coastal surf.
+          Explore urban acoustic pollution in New York City (Manhattan) using cinematic 1080p footage generated with <strong>Google Flow</strong>. 
+          Discover how 20 distinct interventions across four major categories can transform a chaotic, high-noise metropolis into a quiet, 
+          healthy urban sanctuary:
+        </p>
+        <ul style="padding-left: 20px; font-size: 12.5px; color: var(--text-sub); line-height: 1.6; margin-bottom: 10px;">
+          <li><strong>Transportation & Traffic:</strong> Electric transit, low-noise asphalt, speed management, and anti-honking cameras.</li>
+          <li><strong>Architecture & Sound Insulation:</strong> STC-45 building insulation (primarily protects indoor spaces), acoustic facade design, noise barriers, and green buildings.</li>
+          <li><strong>Urban Planning & Source Control:</strong> Heavy industry relocation, linear green belts, entertainment inspections, and construction curfews.</li>
+          <li><strong>Public Awareness & Health:</strong> Community quiet hours, anti-honking culture, and responsible headphone habits (protects personal hearing health).</li>
+        </ul>
+
+        <h3 style="font-size: 14px; margin-top: 14px; color: var(--text-main);">📐 Scientifically Responsible Modeling</h3>
+        <p>
+          Sound levels combine logarithmically rather than linearly:
+          <code style="display: block; background: rgba(0,0,0,0.4); padding: 6px 10px; border-radius: 6px; font-family: monospace; color: #38bdf8; margin: 6px 0;">L_total = 10 · log10( Σ 10^(Li / 10) )</code>
+          A 3 dB decrease represents a 50% cut in acoustic sound energy. The simulation avoids double-counting overlapping interventions 
+          and provides both Outdoor (sidewalk) and Indoor (apartment) acoustic perspectives.
         </p>
 
+        <h3 style="font-size: 14px; margin-top: 14px; color: var(--text-main);">⌨️ Keyboard Shortcuts</h3>
         <p>
-          <strong>NASA Scientific Visualization Studio (SVS) 5650:</strong><br>
-          <em>"Near Real-Time Global Precipitation from the Global Precipitation Measurement Constellation"</em><br>
-          Visualizations by Alex Kekesi with scientific consulting by Dr. George Huffman. 
-          The international satellite constellation integrates GPM Core Observatory, GCOM-W1, NOAA series, Metop, and DMSP 
-          to synthesize global rainfall and snowfall measurements every 30 minutes.
-        </p>
-
-        <p>
-          <strong>Scientific Audio Engine:</strong><br>
-          Rain acoustics are synthesized mathematically in real-time using the Web Audio API based on the observed rainfall rate 
-          (mm/hr) and camera altitude (zoom level). As you zoom in, high-frequency droplet impacts and splash cavitation emerge; 
-          zooming out transitions to atmospheric stratospheric rumbles. Severe convective storms (>25 mm/hr) trigger procedural 
-          sub-bass thunder rolls.
-        </p>
-
-        <p>
-          <strong>Keyboard Shortcuts:</strong><br>
           • <code>/</code> Focus global searchbar<br>
-          • <code>Space</code> Play / Pause rain audio<br>
-          • <code>L</code> Toggle procedural Lo-Fi chillhop mode<br>
-          • <code>H</code> Toggle Zen View (hide/show all UI slowroads-style)<br>
+          • <code>Space</code> Play / Pause audio soundscape<br>
+          • <code>C</code> Switch between Global Rain & Sound of Change<br>
+          • <code>S</code> Find & Fly to Heaviest Rain Area on Earth<br>
+          • <code>L</code> Toggle Lo-Fi chillhop mode<br>
+          • <code>H</code> Toggle Zen View (hide/show all HUD capsules)<br>
           • <code>Right-Click + Drag</code> Tilt and rotate 3D bumpy globe
         </p>
 
@@ -462,6 +478,14 @@
         <div class="noise-section solutions-card">
           <h4 class="noise-section-title solutions-title">🌱 How to Reduce Noise Pollution & Protect Nature</h4>
           <ul id="modal-noise-solutions" class="noise-solutions-list"></ul>
+        </div>
+
+        <!-- Action: Open Sound of Change Interventions -->
+        <div class="noise-section" style="padding-top: 6px;">
+          <button id="modal-btn-open-soc" class="soc-btn soc-btn-primary" style="width: 100%; justify-content: center; padding: 11px 16px; font-size: 13px;" title="Explore interactive urban noise reduction policies in The Sound of Change">
+            <span>🎧 Explore Interventions in Sound of Change (Manhattan)</span>
+            <span>→</span>
+          </button>
         </div>
 
         <!-- Official Resources & External Links -->
