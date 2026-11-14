@@ -71,7 +71,6 @@ class App {
     this.initAudioMixer();
     this.initControls();
     this.initSearch();
-    this.initPresetPills();
     this.initInfocardHover();
     this.loadGlobalPrecipitationBuffer();
   }
@@ -840,13 +839,9 @@ class App {
       locationLabel = `${topSpot.label} (${maxRate.toFixed(1)} mm/hr)`;
     }
 
-    // Button visual feedback on both top button & bottom pill
-    const btns = [
-      document.getElementById('btn-heaviest'),
-      document.getElementById('btn-heaviest-pill')
-    ];
-    btns.forEach((btn) => {
-      if (!btn) return;
+    // Button visual feedback on top button
+    const btn = document.getElementById('btn-heaviest');
+    if (btn) {
       btn.classList.add('active');
       const originalHtml = btn.innerHTML;
       btn.innerHTML = `<span>⚡ Epicenter (${maxRate.toFixed(1)} mm/hr)</span>`;
@@ -854,7 +849,7 @@ class App {
         btn.classList.remove('active');
         btn.innerHTML = originalHtml;
       }, 3500);
-    });
+    }
 
     if (this.isZenMode) {
       this.handleZenUserActivity();
@@ -876,25 +871,6 @@ class App {
       this.sound.startAudio();
       this.setListeningPoint(targetLng, targetLat, locationLabel, true);
     }, 400);
-  }
-
-  // ==========================================
-  // PRESET HOTSPOT PILLS
-  // ==========================================
-
-  initPresetPills() {
-    const container = document.getElementById('hotspot-pills');
-    if (!container) return;
-
-    PRESET_HOTSPOTS.forEach((spot) => {
-      const pill = document.createElement('button');
-      pill.className = 'hotspot-pill';
-      pill.innerHTML = `<span>${spot.name}</span> <small>${spot.tag}</small>`;
-      pill.addEventListener('click', () => {
-        this.lockToLocation(spot.lng, spot.lat, spot.zoom, spot.label);
-      });
-      container.appendChild(pill);
-    });
   }
 
   // ==========================================
@@ -968,7 +944,6 @@ class App {
   initControls() {
     // Initialize controls
     document.getElementById('btn-heaviest')?.addEventListener('click', () => this.flyToHeaviestRainArea());
-    document.getElementById('btn-heaviest-pill')?.addEventListener('click', () => this.flyToHeaviestRainArea());
     document.getElementById('btn-theme')?.addEventListener('click', () => this.cycleTheme());
     document.getElementById('btn-lofi')?.addEventListener('click', () => this.toggleLoFi());
     document.getElementById('btn-listen')?.addEventListener('click', () => this.togglePlayback());

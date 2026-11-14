@@ -56,7 +56,7 @@
   - Independent volume mixers for Rain and Lo-Fi.
 
 - ⚡ **Fly to Heaviest Rain Area on Earth (Hotkey `S`)**:
-  - Click the **⚡ Heaviest** button in the top capsule or the **⚡ Heaviest Rain** pill in the bottom hotspot bar.
+  - Click the **⚡ Heaviest** button in the top action capsule (or press `S`).
   - Instantly scans the active live NASA GPM IMERG 512×512 global precipitation grid to locate the highest rain rate epicenter on the planet.
   - Smoothly flies the 3D globe camera (`flyTo`) directly to the storm eye, sets the listening point, and starts playing the intense downpour/tempest acoustics immediately.
   - Also searchable directly by typing *"heavy"*, *"storm"*, or *"peak"* in the searchbar.

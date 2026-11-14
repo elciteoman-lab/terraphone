@@ -740,74 +740,6 @@ html[data-theme="dark"] .stars-overlay {
 }
 
 /* ==========================================
-   BOTTOM CENTER: QUICK HOTSPOT PILLS
-   ========================================== */
-
-#hud-bottom-center {
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 5px 8px;
-  gap: 6px;
-  max-width: min(760px, 94vw);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-#hud-bottom-center::-webkit-scrollbar {
-  display: none;
-}
-
-.hotspot-pill {
-  white-space: nowrap;
-  background: transparent;
-  border: none;
-  color: var(--text-sub);
-  padding: 6px 14px;
-  border-radius: var(--radius-pill);
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  transition: var(--trans-fast);
-}
-
-.hotspot-pill small {
-  font-size: 10px;
-  color: var(--text-muted);
-  background: var(--tag-bg);
-  padding: 2px 7px;
-  border-radius: var(--radius-pill);
-}
-
-.hotspot-pill:hover {
-  color: var(--text-main);
-  background: var(--tag-bg);
-}
-
-.hotspot-pill.heaviest-pill {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.32);
-  font-weight: 700;
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
-}
-
-.hotspot-pill.heaviest-pill:hover {
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.25);
-  border-color: rgba(245, 158, 11, 0.55);
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.4);
-}
-
-.hotspot-pill.heaviest-pill.active {
-  background: #f59e0b;
-  color: #1c0d02;
-}
-
-/* ==========================================
    INTERACTIVE RAIN & GEO QUIZ PANEL
    ========================================== */
 
@@ -1365,9 +1297,6 @@ body.zen-mode #cursor-tracker {
 
 /* Responsive adjustments */
 @media (max-width: 900px) {
-  #hud-bottom-center {
-    display: none;
-  }
   #hud-bottom-left {
     bottom: 20px;
     width: 280px;
