@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>IMERG Rain Globe — live NASA GPM IMERG</title>
+<link href='https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.css' rel='stylesheet'>
+<script src='https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.js'></script>
+<style>
+:root{--bg:#0b0e14;--panel:rgba(13,18,28,.85);--ink:#e8eef7;--dim:#93a1b5;--line:#243044;--accent:#4fd1c5}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif}
+#map{position:absolute;inset:0}
+.panel{position:absolute;z-index:5;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;backdrop-filter:blur(10px);box-shadow:0 8px 30px rgba(0,0,0,.45)}
+#topbar{top:14px;left:14px;right:14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+h1{font-size:15px;margin:0;font-weight:650}
+h1 small{color:var(--dim);font-weight:500;margin-left:8px}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
+.dot{width:8px;height:8px;border-radius:50%;background:#f59e0b}
+.dot.ok{background:#34d399}.dot.bad{background:#ef4444}
+button{cursor:pointer;border:1px solid var(--line);background:#121826;color:var(--ink);border-radius:10px;padding:8px 14px;font:inherit}
+button:hover{border-color:#3b4a63}
+button.primary{background:var(--accent);color:#04211f;border-color:transparent;font-weight:700}
+button.primary.on{background:#f97316;color:#2a1202}
+#places{left:14px;bottom:14px;display:flex;gap:8px;flex-wrap:wrap;max-width:min(92vw,620px)}
+#readout{right:14px;bottom:14px;width:280px}
+#rate{font-size:34px;font-weight:750;line-height:1;margin:4px 0}
+#rlabel{color:var(--accent);font-weight:650}
+#meta{color:var(--dim);font-size:11.5px;margin-top:8px;border-top:1px solid var(--line);padding-top:8px}
+#legend{left:14px;bottom:76px;font-size:11px;color:var(--dim)}
+#cbar{width:180px;height:8px;border-radius:4px;margin-top:5px;background:#222}
+#cblabels{display:flex;justify-content:space-between;margin-top:3px}
+.hint{color:#fbbf24}
+@media(max-width:760px){#readout{width:210px}#rate{font-size:26px}#legend{display:none}}
+</style>
+</head>
+<body>
+<div id='map'></div>
+<div class='panel' id='topbar'>
+  <div>
+    <h1>IMERG Rain Globe<small>NASA GPM IMERG · live rain via GIBS</small></h1>
+    <span class='badge'><span id='dot' class='dot'></span><span id='src'>connecting…</span></span>
+  </div>
+  <div style='display:flex;gap:10px;align-items:center'>
+    <span id='hint' class='badge hint'></span>
+    <button id='listen' class='primary'>▶ Listen</button>
+  </div>
+</div>
+<div class='panel' id='legend'>
+  <span>IMERG rain rate · mm/hr · log scale</span>
+  <div id='cbar'></div>
+  <div id='cblabels'><span id='cblo'></span><span id='cbmid'></span><span id='cbhi'></span></div>
+</div>
+<div class='panel' id='places'></div>
+<div class='panel' id='readout'>
+  <span class='badge'>rain over map center</span>
+  <div id='rate'>—</div>
+  <div id='rlabel'>waiting for data</div>
+  <div id='meta'>—</div>
+</div>
+<canvas id='work' width='96' height='96' style='display:none'></canvas>
+<script>
+const GIBS='https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi';
+const FALLBACK_IDS=['GPM_3IMERGDL_Precipitation_Rate','GPM_3IMERGDE_Precipitation_Rate','GPM_3IMERGDF_Precipitation_Rate','IMERG_Precipitation_Rate'];
+const FALLBACK=[[0.01,[185,242,245]],[0.03,[147,224,236]],[0.08,[112,198,230]],[0.2,[87,169,219]],[0.5,[75,137,201]],[1,[74,106,179]],[2,[95,155,79]],[5,[143,192,74]],[10,[232,217,74]],[20,[232,162,60]],[40,[217,98,47]],[80,[184,58,38]],[150,[143,36,64]],[300,[109,31,94]]];
+const BASES=[
+ {id:'esri',name:'Esri Dark Gray',attr:'© Esri, Maxar, Earthstar Geographics',tiles:['https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'],test:'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/3/2/1'},
+ {id:'osm',name:'OpenStreetMap (dark)',attr:'© OpenStreetMap contributors',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],test:'https://tile.openstreetmap.org/3/2/1.png',paint:{'raster-saturation':-1,'raster-brightness-max':0.5,'raster-contrast':0.45}},
+ {id:'none',name:'plain globe (no basemap)',attr:'',tiles:null,test:null}
+];
+let active=null,base=null,map=null,rain=null,listening=false,last={};
+const errs=[],palCache={};
+const $=id=>document.getElementById(id);
+const nowISO=()=>new Date().toISOString().slice(0,19)+'Z';
+function setStatus(t,cls){$('src').textContent=t;if(cls)$('dot').className=cls;}
+function wms(layer,bbox,w,h,bust){
+ let u=GIBS+'?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS='+encodeURIComponent(layer)+'&CRS=EPSG:3857&BBOX='+bbox+'&WIDTH='+w+'&HEIGHT='+h+'&FORMAT=image%2Fpng&TRANSPARENT=TRUE&STYLES=';
+ if(active&&active.time)u+='&TIME='+active.time;
+ if(bust)u+='&_='+bust;
+ return u;
+}
+function prettyName(id){
+ const u=id.toUpperCase();
+ if(/IMERGDL|_DL|LATE/.test(u))return 'IMERG Late Run (30 min)';
+ if(/IMERGDE|_DE|EARLY/.test(u))return 'IMERG Early Run (30 min)';
+ if(/IMERGDF|_DF|FINAL/.test(u))return 'IMERG Final Run (daily)';
+ return id;
+}
+async function discover(){
+ setStatus('loading GIBS layer catalog…');
+ const ac=new AbortController();const to=setTimeout(()=>ac.abort(),20000);
+ try{
+  const r=await fetch(GIBS+'?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.3.0',{signal:ac.signal,cache:'no-store'});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const txt=await r.text();
+  const names=[...txt.matchAll(new RegExp('<Name>([^<]+)</Name>','g'))].map(m=>m[1]).filter(n=>/IMERG/i.test(n)&&/PRECIP/i.test(n));
+  const score=n=>{let s=0;const U=n.toUpperCase();
+   if(U.indexOf('RATE')>=0)s+=3;
+   if(/IMERGDL|_DL|LATE/.test(U))s+=5;else if(/IMERGDE|_DE|EARLY/.test(U))s+=3;else if(/IMERGDF|_DF|FINAL/.test(U))s+=1;
+   if(/_07|V07/.test(U))s+=2;
+   return s;};
+  names.sort((a,b)=>score(b)-score(a));
+  return [...new Set(names)];
+ }finally{clearTimeout(to);}
+}
+async function probe(id,time){
+ const u=GIBS+'?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS='+encodeURIComponent(id)+'&CRS=EPSG:3857&BBOX=-2000000,1000000,2000000,5000000&WIDTH=8&HEIGHT=8&FORMAT=image%2Fpng&TRANSPARENT=TRUE&STYLES='+(time?'&TIME='+time:'');
+ const ac=new AbortController();const to=setTimeout(()=>ac.abort(),12000);
+ try{
+  const r=await fetch(u,{signal:ac.signal,cache:'no-store'});
+  const ct=(r.headers.get('content-type')||'').toLowerCase();
+  if(r.ok&&ct.indexOf('image')===0){await r.blob();return true;}
+  const t=await r.text();
+  let why='HTTP '+r.status;
+  if(t){
+   const m=t.match(new RegExp('<Message>([^<]*)</Message>','i'))||t.match(new RegExp('<ServiceException[^>]*>([^<]*)</ServiceException>','i'));
+   if(m)why+=' — '+m[1].trim().slice(0,160);
+  }
+  throw new Error(why);
+ }finally{clearTimeout(to);}
+}
+async function pickBase(){
+ for(const b of BASES){
+  if(!b.test)return b;
+  try{
+   const r=await fetch(b.test,{cache:'no-store'});
+   const ct=(r.headers.get('content-type')||'').toLowerCase();
+   if(r.ok&&ct.indexOf('image')===0)return b;
+   console.warn('[basemap]',b.id,'rejected:',r.status,ct);
+  }catch(e){console.warn('[basemap]',b.id,'unreachable:',e&&e.message);}
+ }
+ return BASES[BASES.length-1];
+}
+async function boot(){
+ let ids=[];
+ try{ids=await discover();ids=ids.slice(0,10);if(ids.length)console.log('[IMERG] catalog:',ids.join(', '));}
+ catch(e){errs.push('catalog: '+(e&&e.message||e));console.warn('[IMERG] GetCapabilities failed:',e);}
+ for(const f of FALLBACK_IDS)if(ids.indexOf(f)<0)ids.push(f);
+ for(const id of ids){
+  setStatus('probing '+id+'…');
+  let t=null;
+  try{await probe(id,null);}
+  catch(e1){
+   try{t=nowISO();await probe(id,t);}
+   catch(e2){errs.push(id+' → '+(e2&&e2.message||e2));console.warn('[IMERG]',id,'failed:',e2&&e2.message||e2);continue;}
+   console.warn('[IMERG]',id,'needs explicit TIME:',e1&&e1.message||e1);
+  }
+  active={id:id,name:prettyName(id),time:t};
+  break;
+ }
+ base=await pickBase();
+ buildMap();
+ if(active){
+  setStatus('live: '+active.name+' · '+active.id,'dot ok');
+  loadPalette(active.id).then(p=>{if(p){palCache[active.id]=p;drawLegend();}});
+  map.on('load',()=>{drawLegend();refresh(true);});
+ }else{
+  if(!errs.length)errs.push('no IMERG precipitation layer found');
+  setStatus('NASA GIBS error: '+errs.slice(0,2).join(' | '),'dot bad');
+  $('hint').textContent='GIBS unreachable — reload to retry';
+ }
+}
+function buildMap(){
+ const sources={},layers=[{id:'bg',type:'background',paint:{'background-color':'#0a0d13'}}];
+ if(base.tiles){sources.base={type:'raster',tileSize:256,tiles:base.tiles};layers.push({id:'base',type:'raster',source:'base',paint:base.paint||{}});}
+ if(active){sources.rain={type:'raster',tileSize:256,tiles:[wms(active.id,'{bbox-epsg-3857}',256,256,active.time||Date.now())]};layers.push({id:'rain',type:'raster',source:'rain',paint:{'raster-opacity':0.8,'raster-fade-duration':250}});}
+ map=new maplibregl.Map({container:'map',style:{version:8,projection:{type:'globe'},sources:sources,layers:layers},center:[-55,-3],zoom:2.4,minZoom:1,maxZoom:12,attributionControl:false});
+ map.on('style.load',()=>{try{map.setProjection({type:'globe'});}catch(e){}});
+ map.on('error',e=>{if(e&&e.sourceId)console.warn('[map]',e.sourceId,e&&e.error&&e.error.message||e.error);});
+ map.on('move',()=>refresh(false));
+ map.on('moveend',()=>refresh(true));
+}
+async function loadPalette(id){
+ for(const root of ['https://gibs.earthdata.nasa.gov/colormaps/v3.0/','https://gibs.earthdata.nasa.gov/colormaps/v1.3/']){
+  try{
+   const r=await fetch(root+id+'.xml',{cache:'force-cache'});
+   if(!r.ok)continue;
+   const doc=new DOMParser().parseFromString(await r.text(),'text/xml');
+   const out=[];
+   for(const el of doc.getElementsByTagName('*')){
+    if(el.tagName.toLowerCase().indexOf('entry')<0)continue;
+    const a={};for(const at of el.attributes)a[at.name.toLowerCase()]=at.value.trim();
+    const v=parseFloat(a.value);if(!isFinite(v))continue;
+    let rgb=null;
+    if(a.color&&a.color.charAt(0)==='#'){const hx=a.color.slice(1);rgb=[parseInt(hx.slice(0,2),16),parseInt(hx.slice(2,4),16),parseInt(hx.slice(4,6),16)];}
+    else if(a.red!==undefined&&a.green!==undefined&&a.blue!==undefined)rgb=[+a.red,+a.green,+a.blue];
+    else if(a.rgb){const parts=a.rgb.split(',');rgb=[+parts[0],+parts[1],+parts[2]];}
+    if(rgb)out.push({v:v,c:rgb});
+   }
+   if(out.length>=4){out.sort((p,q)=>p.v-q.v);return out;}
+  }catch(e){}
+ }
+ return null;
+}
+function palOf(){return palCache[active.id]||FALLBACK.map(p=>({v:p[0],c:p[1]}));}
+function nearest(pal,r,g,b){let best=1e12,v=0;for(const p of pal){const c=p.c;const d=(r-c[0])*(r-c[0])+(g-c[1])*(g-c[1])+(b-c[2])*(b-c[2]);if(d<best){best=d;v=p.v;}}return v;}
+function drawLegend(){
+ if(!active)return;
+ const pal=palOf();const lo=Math.log10(pal[0].v),hi=Math.log10(pal[pal.length-1].v);
+ const stops=pal.map(p=>{const t=Math.max(0,Math.min(1,(Math.log10(p.v)-lo)/(hi-lo||1)));return 'rgb('+p.c[0]+','+p.c[1]+','+p.c[2]+') '+(t*100).toFixed(1)+'%';}).join(',');
+ $('cbar').style.background='linear-gradient(90deg,'+stops+')';
+ $('cblo').textContent=fmLegend(pal[0].v);$('cbhi').textContent=fmLegend(pal[pal.length-1].v);$('cbmid').textContent=fmLegend(Math.pow(10,(lo+hi)/2));
+}
+function fmLegend(v){return v<0.1?v.toFixed(2):v<10?v.toFixed(1):String(Math.round(v));}
+const work=$('work'),wctx=work.getContext('2d',{willReadFrequently:true});
+function lngWrap(l){return ((l+180)%360+360)%360-180;}
+function mm(lng,lat){const R=6378137;const la=Math.max(-85,Math.min(85,lat));return [R*lngWrap(lng)*Math.PI/180,R*Math.log(Math.tan(Math.PI/4+la*Math.PI/360))];}
+async function getBmp(url,sig){
+ const r=await fetch(url,{cache:'no-store',signal:sig});if(!r.ok)throw new Error('http '+r.status);
+ const b=await r.blob();
+ try{return await createImageBitmap(b);}catch(e){const img=new Image();img.src=URL.createObjectURL(b);await img.decode();return img;}
+}
+async function sample(sig){
+ if(!active)return null;
+ const b=map.getBounds();
+ const sw=mm(b.getWest(),b.getSouth()),ne=mm(b.getEast(),b.getNorth());
+ let x0=sw[0],y0=sw[1],x1=ne[0],y1=ne[1];
+ if(x0>x1){x0=-20037508;x1=20037508;}
+ const url=wms(active.id,x0.toFixed(0)+','+y0.toFixed(0)+','+x1.toFixed(0)+','+y1.toFixed(0),96,96);
+ const bmp=await getBmp(url,sig);
+ wctx.drawImage(bmp,0,0,96,96);
+ const d=wctx.getImageData(0,0,96,96).data;
+ const pal=palOf();
+ let sum=0,wsum=0,cn=0,cover=0,mx=0;
+ for(let py=0;py<96;py++)for(let px=0;px<96;px++){
+  const i=(py*96+px)*4;if(d[i+3]<10)continue;
+  cover++;const v=nearest(pal,d[i],d[i+1],d[i+2]);
+  if(v>mx)mx=v;sum+=v;
+  const wx=(px-47.5)/47.5,wy=(py-47.5)/47.5;const w=Math.exp(-(wx*wx+wy*wy)*0.8);
+  wsum+=v*w;cn+=w;
+ }
+ if(cover<8)return {empty:true};
+ const avg=sum/cover,cw=cn>0?wsum/cn:avg;
+ return {rate:0.55*cw+0.45*avg,avg:avg,max:mx,cover:cover/92.16};
+}
+class Rain{
+ constructor(){
+  const c=this.ctx=new (window.AudioContext||window.webkitAudioContext)();
+  this.master=c.createGain();this.master.gain.value=0;
+  if(c.createStereoPanner){this.out=c.createStereoPanner();this.master.connect(this.out);this.out.connect(c.destination);}else{this.master.connect(c.destination);}
+  this.whiteBuf=this.mkNoise('white',2);this.brownBuf=this.mkNoise('brown',3);
+  this.hiss=c.createGain();this.hiss.gain.value=0;
+  this.hp=c.createBiquadFilter();this.hp.type='highpass';this.hp.frequency.value=350;
+  this.lp=c.createBiquadFilter();this.lp.type='lowpass';this.lp.frequency.value=4500;
+  const n=c.createBufferSource();n.buffer=this.whiteBuf;n.loop=true;n.connect(this.hp);this.hp.connect(this.lp);this.lp.connect(this.hiss);this.hiss.connect(this.master);n.start();
+  this.body=c.createGain();this.body.gain.value=0;
+  const blp=c.createBiquadFilter();blp.type='lowpass';blp.frequency.value=220;
+  const bn=c.createBufferSource();bn.buffer=this.brownBuf;bn.loop=true;bn.connect(blp);blp.connect(this.body);this.body.connect(this.master);bn.start();
+  this.drops=0;this.lvl=0;this.acc=0;this.tm=performance.now();this.pendThunder=false;this.state=null;
+  setInterval(()=>this.tick(),120);
+ }
+ mkNoise(kind,sec){const c=this.ctx,n=(sec*c.sampleRate)|0,b=c.createBuffer(1,n,c.sampleRate),d=b.getChannelData(0);let lastv=0;for(let i=0;i<n;i++){const w=Math.random()*2-1;if(kind==='brown'){lastv=(lastv+0.02*w)/1.02;d[i]=lastv*3.5;}else d[i]=w;}return b;}
+ set(s){
+  this.state=s;
+  const r=Math.max(0,s.rate||0);const on=!!(s.listening&&s.zoom>=3.5&&!s.empty&&this.ctx.state==='running');
+  const x=Math.min(1,Math.max(0,(r-0.1)/50));
+  const h=Math.pow(x,1.3)*0.42;
+  const b=Math.min(1,Math.max(0,(r-10)/80))*0.3;
+  const t=this.ctx.currentTime;
+  this.master.gain.setTargetAtTime(on?0.75:0,t,0.12);
+  this.hiss.gain.setTargetAtTime(on?h:0,t,0.25);
+  this.body.gain.setTargetAtTime(on?b:0,t,0.35);
+  this.lp.frequency.setTargetAtTime(1200+h*2200,t,0.3);
+  this.lvl=h/0.42;this.drops=on&&r>0.05?Math.min(40,0.6+r*2.5):0;
+  if(on&&r>25&&!this.pendThunder&&Math.random()<Math.min(0.3,(r-25)/70*0.3)){this.pendThunder=true;this.nextThunder=performance.now()+3000+Math.random()*12000;}
+  if(!on)this.pendThunder=false;
+ }
+ mute(){
+  this.state=this.state||{};this.state.listening=false;
+  this.drops=0;this.pendThunder=false;
+  this.master.gain.setTargetAtTime(0,this.ctx.currentTime,0.08);
+ }
+ unmute(){
+  const s=this.state||{};
+  const go=()=>this.set(Object.assign({},s,{listening:true}));
+  if(this.ctx.state==='running')go();else this.ctx.resume().then(go).catch(go);
+ }
+ tick(){
+  const now=performance.now();
+  if(this.drops>0){this.acc+=this.drops*(now-this.tm)/1000;while(this.acc>=1){this.acc-=1;this.drop();}}
+  this.tm=now;
+  if(this.pendThunder&&now>this.nextThunder){this.pendThunder=false;this.thunder();}
+ }
+ drop(){
+  const c=this.ctx,t=c.currentTime+Math.random()*0.3;
+  const s=c.createBufferSource();s.buffer=this.whiteBuf;
+  const f=c.createBiquadFilter();f.type='bandpass';f.frequency.value=700+Math.random()*6500;f.Q.value=5+Math.random()*9;
+  const g=c.createGain();const amp=(0.02+Math.random()*0.07)*(0.35+0.65*Math.min(1,this.lvl*2.5));
+  g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(amp,t+0.004);g.gain.exponentialRampToValueAtTime(0.0001,t+0.04+Math.random()*0.06);
+  s.connect(f);f.connect(g);
+  if(c.createStereoPanner){const p=c.createStereoPanner();p.pan.value=Math.random()*1.6-0.8;g.connect(p);p.connect(this.master);}else g.connect(this.master);
+  s.start(t,Math.random()*1.6,0.12);s.stop(t+0.16);
+ }
+ thunder(){
+  const c=this.ctx,t=c.currentTime+0.05;
+  for(const [dt,vol] of [[0,0.8],[0.7,0.3]]){
+   const s=c.createBufferSource();s.buffer=this.brownBuf;s.loop=true;s.playbackRate.value=0.6+Math.random()*0.4;
+   const f=c.createBiquadFilter();f.type='lowpass';f.frequency.value=110+Math.random()*140;
+   const g=c.createGain();g.gain.setValueAtTime(0.0001,t+dt);
+   g.gain.exponentialRampToValueAtTime(vol,t+dt+0.09+Math.random()*0.15);
+   g.gain.exponentialRampToValueAtTime(0.0001,t+dt+2.6+Math.random()*2);
+   s.connect(f);f.connect(g);g.connect(this.master);
+   s.start(t+dt,Math.random()*2);s.stop(t+dt+6);
+  }
+ }
+}
+function rlabel(v){if(v<0.05)return 'trace / no rain';if(v<0.5)return 'drizzle';if(v<2.5)return 'light rain';if(v<10)return 'steady rain';if(v<30)return 'heavy rain';if(v<80)return 'downpour';return 'torrential rain';}
+function fmt(v){return v<1?v.toFixed(2):v<10?v.toFixed(1):String(Math.round(v));}
+let ctl=null,lastT=0;
+function applyAudio(){
+ if(!map||!rain)return;
+ rain.set({rate:last.rate,listening:listening,zoom:map.getZoom(),empty:last.empty});
+}
+async function refresh(force){
+ if(!map||!active)return;
+ const now=performance.now();
+ if(!force&&now-lastT<600)return;
+ if(ctl){try{ctl.abort();}catch(e){}}
+ lastT=now;
+ const my=new AbortController();ctl=my;
+ const to=setTimeout(()=>{try{my.abort();}catch(e){}},5000);
+ let s=null;
+ try{s=await sample(my.signal);}catch(e){s=null;}
+ clearTimeout(to);
+ if(ctl!==my)return;
+ ctl=null;
+ if(s)last=s;
+ const z=map.getZoom();
+ if(last.rate===undefined){$('rate').textContent='…';$('rlabel').textContent='sampling…';}
+ else if(last.empty){$('rate').textContent='0';$('rlabel').textContent='no rain detected in view';}
+ else{$('rate').textContent=fmt(last.rate);$('rlabel').textContent=rlabel(last.rate);}
+ $('meta').innerHTML='layer: '+active.id+'<br>granule: '+(active.time?active.time:'latest available')+'<br>basemap: '+base.name+(base.attr?' · '+base.attr:'')+'<br>zoom: '+z.toFixed(1)+' · coverage: '+Math.round((last.cover||0)*100)+'%<br>data: NASA GIBS WMS · sound synthesized locally';
+ if(!listening)$('hint').textContent=z<3.5?'zoom in (z3.5+) to hear rain':'press Listen to hear this rain';
+ else if(z<3.5)$('hint').textContent='zoom in (z3.5+) to hear rain';
+ else if(last.empty)$('hint').textContent='no rain detected in view';
+ else $('hint').textContent='listening to '+rlabel(last.rate).toLowerCase();
+ applyAudio();
+}
+const PLACES=[['Amazon Basin',-62,-3.5,6],['Singapore',103.85,1.29,7],['Cherrapunji',91.7,25.3,7],['Lagos',3.4,6.5,7],['Miami',-80.2,25.8,7],['Sahara (dry)',13,23,6]];
+for(const p of PLACES){const b=document.createElement('button');b.textContent=p[0];b.onclick=()=>map.flyTo({center:[p[1],p[2]],zoom:p[3],duration:2600});$('places').appendChild(b);}
+$('listen').addEventListener('click',()=>{
+ listening=!listening;
+ if(listening&&!rain)rain=new Rain();
+ if(rain){rain.ctx.resume();if(listening)rain.unmute();else rain.mute();}
+ $('listen').textContent=listening?'■ Mute':'▶ Listen';
+ $('listen').classList.toggle('on',listening);
+ refresh(true);
+});
+setInterval(()=>{
+ if(!map||!active)return;
+ try{
+  if(active.time)active.time=nowISO();
+  map.removeLayer('rain');map.removeSource('rain');
+  map.addSource('rain',{type:'raster',tileSize:256,tiles:[wms(active.id,'{bbox-epsg-3857}',256,256,active.time||Date.now())]});
+  map.addLayer({id:'rain',type:'raster',source:'rain',paint:{'raster-opacity':0.8,'raster-fade-duration':250}});
+ }catch(e){}
+},15*60*1000);
+setInterval(()=>refresh(true),2000);
+if(window.maplibregl)boot();else setStatus('map library failed to load — check internet or adblocker','dot bad');
+</script>
+</body>
+</html>
