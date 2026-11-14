@@ -2,7 +2,7 @@
 
 > **NASA Space Apps Challenge** · Live Global Rain, Thunder & Atmospheric Sound Simulator  
 > Powered by **NASA Scientific Visualization Studio (SVS) Entry 5650** & **NASA GPM IMERG**  
-> 🔗 **Live Demo**: [https://vylt-gh.github.io/raIn.tensity/](https://vylt-gh.github.io/raIn.tensity/)
+> 🔗 **Live Demo**: [https://vylt-gh.github.io/terraphone/](https://vylt-gh.github.io/terraphone/)
 
 `Terraphone` is an immersive global rain, thunder, and atmospheric sound simulator designed with a sleek, minimalist, out-of-your-way UI inspired by **slowroads.io**. Explore the Earth as a tactile 3D bumpy globe, discover near-real-time global storm systems, and listen to authentic multi-layered soundscapes combining live rain droplet physics, convective NASA thunder rolls, and location-dependent habitat ambience (urban traffic, rural insects, jungle wildlife, and ocean swells).
 
