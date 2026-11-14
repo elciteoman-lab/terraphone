@@ -1267,94 +1267,74 @@ html[data-theme="dark"] .stars-overlay {
 }
 
 /* ==========================================
-   LISTENING POINT TARGET RETICLE CROSSHAIR (HIGH CONTRAST)
-   Dual-Contrast Tactical Design: Luminous Solar Amber + Crisp Shadow Core
+   LISTENING POINT TARGET RETICLE CROSSHAIR (PLAIN BLACK)
    ========================================== */
 
 .listening-crosshair {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   position: relative;
   pointer-events: none;
   user-select: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 1px rgba(0, 0, 0, 1));
 }
 
 .crosshair-ring {
   position: absolute;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 2px solid #fbbf24;
-  outline: 1.5px solid rgba(0, 0, 0, 0.9);
-  box-shadow: 0 0 10px rgba(245, 158, 11, 0.85), inset 0 0 6px rgba(245, 158, 11, 0.4);
-  animation: crosshair-pulse 2.6s ease-in-out infinite;
+  border: 1.5px solid #000000;
+  box-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
 .crosshair-center {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 1.5px solid #000000;
-  box-shadow: 0 0 8px #fbbf24, 0 0 16px rgba(245, 158, 11, 1);
-  z-index: 2;
+  background: #000000;
+  box-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
 .crosshair-tick {
   position: absolute;
-  background: #fbbf24;
-  border: 1px solid #000000;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.9);
-  z-index: 1;
+  background: #000000;
+  box-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
 .crosshair-tick.tick-top {
-  top: 0px;
+  top: 1px;
   left: 50%;
-  width: 2px;
-  height: 8px;
+  width: 1.5px;
+  height: 6px;
   transform: translateX(-50%);
 }
 
 .crosshair-tick.tick-bottom {
-  bottom: 0px;
+  bottom: 1px;
   left: 50%;
-  width: 2px;
-  height: 8px;
+  width: 1.5px;
+  height: 6px;
   transform: translateX(-50%);
 }
 
 .crosshair-tick.tick-left {
-  left: 0px;
+  left: 1px;
   top: 50%;
-  width: 8px;
-  height: 2px;
+  width: 6px;
+  height: 1.5px;
   transform: translateY(-50%);
 }
 
 .crosshair-tick.tick-right {
-  right: 0px;
+  right: 1px;
   top: 50%;
-  width: 8px;
-  height: 2px;
+  width: 6px;
+  height: 1.5px;
   transform: translateY(-50%);
-}
-
-@keyframes crosshair-pulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-  50% {
-    transform: scale(1.12);
-    opacity: 1;
-    border-color: #fef08a;
-  }
 }
 
 /* ==========================================
