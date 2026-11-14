@@ -234,7 +234,7 @@ class App {
             paint: {
               'raster-opacity': 0.90,
               'raster-fade-duration': 200,
-              'raster-brightness-max': 1.15,
+              'raster-brightness-max': 1.0,
               'raster-contrast': 0.35,
               'raster-saturation': 0.12,
               'raster-resampling': 'linear'
@@ -315,11 +315,11 @@ class App {
 
       try {
         if (this.map && this.map.getLayer('cloud-deck-layer')) {
-          this.map.setPaintProperty('cloud-deck-layer', 'raster-brightness-max', 1.85);
+          this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.85);
           setTimeout(() => {
             try {
               if (this.map && this.map.getLayer('cloud-deck-layer')) {
-                this.map.setPaintProperty('cloud-deck-layer', 'raster-brightness-max', 1.15);
+                this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.35);
               }
             } catch (e) {}
           }, 200);
@@ -1308,6 +1308,10 @@ class App {
   }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', () => {
+    window.app = new App();
+  });
+} else {
   window.app = new App();
-});
+}
