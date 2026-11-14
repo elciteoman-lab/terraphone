@@ -184,7 +184,7 @@ html[data-theme="dark"] .stars-overlay {
   top: 18px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(480px, 92vw);
+  width: min(360px, 28vw);
   padding: 0;
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-hud);
@@ -1362,6 +1362,15 @@ body.zen-mode #cursor-tracker {
 }
 
 /* Responsive adjustments */
+@media (max-width: 1500px) {
+  #hud-top-center {
+    top: 76px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(460px, 90vw);
+  }
+}
+
 @media (max-width: 900px) {
   #hud-bottom-left {
     bottom: 20px;
