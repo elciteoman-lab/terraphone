@@ -1,5 +1,5 @@
 /**
- * raIn.tensity - Data & Meteorological Profiles
+ * Terraphone - Data & Meteorological Profiles
  * NASA Space Apps Challenge · GPM IMERG & NASA SVS 5650
  */
 
@@ -21,7 +21,7 @@ export const IMERG_PALETTE = [
   { v: 300.0, rgb: [109, 31, 94] }
 ];
 
-// Deep Scientific Rain Type Profiles & Infocard Content
+// Deep Scientific Rain Type Profiles & Infocard Content with Visual WebP Imagery
 export const RAIN_TYPES = {
   clear: {
     id: 'clear',
@@ -30,6 +30,8 @@ export const RAIN_TYPES = {
     icon: '☀️',
     rateMin: 0.0,
     rateMax: 0.05,
+    image: 'img/raintypes/clear.webp',
+    imageCaption: 'Cirrus fibratus & cloudless troposphere',
     scientificClass: 'Negligible Precipitation / Sub-saturated Air',
     cloudGenus: 'Cirrus fibratus / Altocumulus / Clear Sky',
     dropDiameter: '< 0.1 mm (Atmospheric Aerosol / Virga)',
@@ -46,6 +48,8 @@ export const RAIN_TYPES = {
     icon: '🌫️',
     rateMin: 0.05,
     rateMax: 1.0,
+    image: 'img/raintypes/drizzle.webp',
+    imageCaption: 'Stratocumulus mist & low-hanging stratus sheet',
     scientificClass: 'Stratiform Micro-droplet Precipitation',
     cloudGenus: 'Stratus fractus / Stratocumulus opacus',
     dropDiameter: '0.2 – 0.5 mm (Micro-droplets)',
@@ -62,6 +66,8 @@ export const RAIN_TYPES = {
     icon: '🌦️',
     rateMin: 1.0,
     rateMax: 3.5,
+    image: 'img/raintypes/light.webp',
+    imageCaption: 'Uniform nimbostratus with continuous gentle droplets',
     scientificClass: 'Warm-Front Stratiform Rainfall',
     cloudGenus: 'Nimbostratus / Altostratus translucidus',
     dropDiameter: '0.6 – 1.4 mm',
@@ -78,6 +84,8 @@ export const RAIN_TYPES = {
     icon: '🌧️',
     rateMin: 3.5,
     rateMax: 10.0,
+    image: 'img/raintypes/moderate.webp',
+    imageCaption: 'Deep nimbostratus praecipitatio rain sheet',
     scientificClass: 'Deep Stratiform / Moderate Frontal System',
     cloudGenus: 'Nimbostratus praecipitatio',
     dropDiameter: '1.5 – 2.8 mm',
@@ -94,6 +102,8 @@ export const RAIN_TYPES = {
     icon: '🌧️',
     rateMin: 10.0,
     rateMax: 30.0,
+    image: 'img/raintypes/heavy.webp',
+    imageCaption: 'Cumulonimbus shelf cloud with heavy precipitation shaft',
     scientificClass: 'Convective Rainband / Orographic Downpour',
     cloudGenus: 'Cumulonimbus calvus / Embedded Convection',
     dropDiameter: '2.5 – 4.0 mm',
@@ -110,6 +120,8 @@ export const RAIN_TYPES = {
     icon: '⛈️',
     rateMin: 30.0,
     rateMax: 70.0,
+    image: 'img/raintypes/torrential.webp',
+    imageCaption: 'Cumulonimbus incus anvil with extreme convective deluge',
     scientificClass: 'Deep Convective Mesoscale Storm Core',
     cloudGenus: 'Cumulonimbus capillatus incus (Anvil Cloud)',
     dropDiameter: '3.5 – 5.5 mm (Large Breakup Droplets)',
@@ -126,6 +138,8 @@ export const RAIN_TYPES = {
     icon: '🌪️',
     rateMin: 70.0,
     rateMax: 350.0,
+    image: 'img/raintypes/extreme.webp',
+    imageCaption: 'Severe supercell mesocyclone & extreme cloudburst',
     scientificClass: 'Monsoonal Squall Line / Tropical Cyclone Eyewall',
     cloudGenus: 'Cumulonimbus incus mammatus (Severe Supercell)',
     dropDiameter: '4.5 – 6.5 mm (Near Aerodynamic Stability Limit)',

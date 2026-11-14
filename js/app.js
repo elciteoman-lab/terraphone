@@ -1,10 +1,11 @@
 /**
- * raIn.tensity - Main Application Controller
+ * Terraphone - Main Application Controller
  * NASA Space Apps Challenge · NASA SVS 5650 & GPM IMERG
- * Centered Bumpy Globe with Elevation Colormap · Bilinear Data Interpolation · Zen Auto-Rotation
+ * Centered Bumpy Globe with Elevation Colormap · Bilinear Data Interpolation
+ * Hovering Atmospheric Cloud Deck · Convective Thunder & Lightning · Location Ambience
  */
 
-import { IMERG_PALETTE, RAIN_TYPES, getRainType, PRESET_HOTSPOTS } from './data.js';
+import { IMERG_PALETTE, RAIN_TYPES, getRainType, PRESET_HOTSPOTS, CITIES_DATABASE, QUIZ_QUESTIONS } from './data.js';
 import { SoundEngine } from './audio.js';
 import { SearchController } from './search.js';
 
@@ -31,7 +32,9 @@ class App {
     // Listening & Target state
     this.isListening = false;
     this.listeningTarget = null;
+    this.currentEnv = 'rural';
     this.activeRainLayerId = 'IMERG_Precipitation_Rate_30min';
+    this.convectiveThunderTimer = null;
 
     // High-performance CPU-cached precipitation buffer (zero GPU readbacks)
     this.samplingCanvas = document.createElement('canvas');
@@ -52,6 +55,11 @@ class App {
     this.autoRotateSpeed = 0.055; // Smooth degrees per frame
     this.zenInactivityTimer = null;
 
+    // Quiz state
+    this.quizIndex = 0;
+    this.quizScore = 0;
+    this.quizAnswered = false;
+
     // UI elements
     this.cursorTracker = document.getElementById('cursor-tracker');
     this.trackerRate = document.getElementById('tracker-rate');
@@ -71,6 +79,7 @@ class App {
     this.initAudioMixer();
     this.initControls();
     this.initSearch();
+    this.initQuiz();
     this.initInfocardHover();
     this.loadGlobalPrecipitationBuffer();
   }
@@ -80,7 +89,7 @@ class App {
   // ==========================================
 
   initTheme() {
-    const saved = localStorage.getItem('raintensity_theme') || 'auto';
+    const saved = localStorage.getItem('terraphone_theme') || localStorage.getItem('raintensity_theme') || 'auto';
     this.setTheme(saved, false);
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -93,7 +102,7 @@ class App {
   setTheme(mode, persist = true) {
     this.themeMode = mode;
     if (persist) {
-      localStorage.setItem('raintensity_theme', mode);
+      localStorage.setItem('terraphone_theme', mode);
     }
     this.applyEffectiveTheme();
     this.updateThemeButtonVisual();
@@ -135,7 +144,7 @@ class App {
   }
 
   // ==========================================
-  // 3D BUMPY GLOBE WITH ELEVATION COLORMAP
+  // 3D BUMPY GLOBE WITH HOVERING CLOUD DECK
   // ==========================================
 
   initMap() {
@@ -149,7 +158,7 @@ class App {
         version: 8,
         projection: { type: 'globe' },
         sources: {
-          // 1. Elevation-Colored Physical Geography Basemap (Green valleys -> Amber plateaus -> Sienna peaks -> Snow summits)
+          // 1. Elevation-Colored Physical Geography Basemap
           'base-source': {
             type: 'raster',
             tiles: BASEMAP_TILES.physical,
@@ -203,15 +212,32 @@ class App {
               'hillshade-illumination-direction': 315
             }
           },
-          // Bilinear Interpolated Rain Layer (Smooth, non-blocky contours)
+          // 1. Ground Cloud Shadow Layer (Casts dark diffuse cloud shadows on 3D terrain)
           {
-            id: 'rain-layer',
+            id: 'cloud-shadow-layer',
             type: 'raster',
             source: 'rain-source',
             paint: {
-              'raster-opacity': 0.88,
+              'raster-opacity': 0.38,
               'raster-fade-duration': 200,
-              'raster-resampling': 'linear' // Bilinear hardware interpolation on GPU!
+              'raster-brightness-max': 0.10,
+              'raster-contrast': 0.55,
+              'raster-saturation': -1.0,
+              'raster-resampling': 'linear'
+            }
+          },
+          // 2. Hovering Atmospheric Storm Cloud Deck
+          {
+            id: 'cloud-deck-layer',
+            type: 'raster',
+            source: 'rain-source',
+            paint: {
+              'raster-opacity': 0.90,
+              'raster-fade-duration': 200,
+              'raster-brightness-max': 1.15,
+              'raster-contrast': 0.35,
+              'raster-saturation': 0.12,
+              'raster-resampling': 'linear'
             }
           }
         ],
@@ -220,8 +246,9 @@ class App {
           exaggeration: this.bumpLevel
         },
         sky: {
-          'sky-color': isDark ? '#05070d' : '#dbeafe',
-          'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.85, 4, 0.65, 7, 0]
+          'sky-color': isDark ? '#05070d' : '#cfe2fe',
+          'horizon-color': isDark ? '#0a1628' : '#e0f2fe',
+          'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.90, 4, 0.65, 7, 0.15]
         }
       },
       center: [0, 15],
@@ -258,7 +285,6 @@ class App {
         });
       }
 
-      // If user moves mouse during Zen mode, pause autorotation
       if (this.isZenMode) {
         this.handleZenUserActivity();
       }
@@ -266,7 +292,7 @@ class App {
 
     this.map.on('mouseout', () => this.hideCursorTracker());
 
-    // Globe Click listener: ONLY START PLAYING WHEN CLICKED
+    // Globe Click listener: start listening at click point
     this.map.on('click', (e) => {
       if (this.isZenMode) {
         this.handleZenUserActivity();
@@ -277,6 +303,28 @@ class App {
     // Drag / Pan interaction in Zen Mode
     this.map.on('dragstart', () => {
       if (this.isZenMode) this.handleZenUserActivity();
+    });
+
+    // Thunder strike callback for visual lightning flash
+    this.sound.onThunder(({ duration }) => {
+      const overlay = document.getElementById('lightning-overlay');
+      if (overlay) {
+        overlay.classList.add('flashing');
+        setTimeout(() => overlay.classList.remove('flashing'), duration || 250);
+      }
+
+      try {
+        if (this.map && this.map.getLayer('cloud-deck-layer')) {
+          this.map.setPaintProperty('cloud-deck-layer', 'raster-brightness-max', 1.85);
+          setTimeout(() => {
+            try {
+              if (this.map && this.map.getLayer('cloud-deck-layer')) {
+                this.map.setPaintProperty('cloud-deck-layer', 'raster-brightness-max', 1.15);
+              }
+            } catch (e) {}
+          }, 200);
+        }
+      } catch (e) {}
     });
 
     // Refresh NASA IMERG rain layer every 10 minutes
@@ -389,26 +437,21 @@ class App {
 
     if (fx < 0 || fx >= 512 || fy < 0 || fy >= 512) return 0;
 
-    // Four bounding integer coordinates
     const x0 = Math.floor(fx);
     const x1 = Math.min(511, x0 + 1);
     const y0 = Math.floor(fy);
     const y1 = Math.min(511, y0 + 1);
 
-    // Fractional interpolation weights
     const wx = fx - x0;
     const wy = fy - y0;
 
-    // Sample discrete corner pixel rates
     const r00 = this.getPixelRainRate(x0, y0);
     const r10 = this.getPixelRainRate(x1, y0);
     const r01 = this.getPixelRainRate(x0, y1);
     const r11 = this.getPixelRainRate(x1, y1);
 
-    // If completely clear
     if (r00 === 0 && r10 === 0 && r01 === 0 && r11 === 0) return 0;
 
-    // Smooth continuous bilinear interpolation
     const top = (1 - wx) * r00 + wx * r10;
     const bottom = (1 - wx) * r01 + wx * r11;
     const interpolated = (1 - wy) * top + wy * bottom;
@@ -445,6 +488,62 @@ class App {
   }
 
   // ==========================================
+  // LOCATION HABITAT CLASSIFIER
+  // Urban / Rural / Jungle / Ocean
+  // ==========================================
+
+  classifyLocationEnvironment(lng, lat) {
+    // 1. Check ocean / maritime zones
+    const inPacific = (lng < -125 && lng > -175 && Math.abs(lat) < 55) || (lng > 150 && lng < 180 && Math.abs(lat) < 40);
+    const inAtlantic = (lng > -45 && lng < -18 && Math.abs(lat) < 45);
+    const inIndian = (lng > 55 && lng < 95 && lat < 5 && lat > -45);
+    const inSouthern = (lat < -55);
+    const inArctic = (lat > 78);
+    if (inPacific || inAtlantic || inIndian || inSouthern || inArctic) {
+      return 'ocean';
+    }
+
+    // 2. Check equatorial / tropical rainforests (Jungle wildlife)
+    // Amazon Basin
+    if (lat >= -12 && lat <= 6 && lng >= -76 && lng <= -48) return 'jungle';
+    // Congo Basin
+    if (lat >= -7 && lat <= 6 && lng >= 12 && lng <= 30) return 'jungle';
+    // Southeast Asia / Borneo / Sumatra / Papua
+    if (lat >= -10 && lat <= 10 && lng >= 96 && lng <= 150) return 'jungle';
+    // Chocó Rainforest (Colombia)
+    if (lat >= 2 && lat <= 9 && lng >= -78 && lng <= -75) return 'jungle';
+
+    // 3. Check urban proximity (Metropolises from CITIES_DATABASE)
+    for (const city of CITIES_DATABASE) {
+      const dLng = lng - city.lng;
+      const dLat = lat - city.lat;
+      const distSq = dLng * dLng + dLat * dLat;
+      if (distSq < 0.30) {
+        return 'urban';
+      }
+    }
+
+    // 4. Default: Countryside / Rural woodland
+    return 'rural';
+  }
+
+  updateEnvironmentBadge(envType) {
+    const badgeIcon = document.getElementById('hud-env-icon');
+    const badgeLabel = document.getElementById('hud-env-label');
+    if (!badgeIcon || !badgeLabel) return;
+
+    const map = {
+      urban: { icon: '🏙️', label: 'Urban Ambience' },
+      rural: { icon: '🦗', label: 'Rural Ambience' },
+      jungle: { icon: '🦜', label: 'Rainforest Wildlife' },
+      ocean: { icon: '🌊', label: 'Ocean Swell' }
+    };
+    const info = map[envType] || map.rural;
+    badgeIcon.textContent = info.icon;
+    badgeLabel.textContent = info.label;
+  }
+
+  // ==========================================
   // ZEN MODE CINEMATIC AUTO-ROTATION
   // ==========================================
 
@@ -476,7 +575,6 @@ class App {
   handleZenUserActivity() {
     this.pauseZenAutoRotation();
     clearTimeout(this.zenInactivityTimer);
-    // Smoothly resume autorotation after 3.2 seconds of inactivity
     this.zenInactivityTimer = setTimeout(() => {
       if (this.isZenMode) {
         this.startZenAutoRotation();
@@ -494,10 +592,8 @@ class App {
         toast.classList.add('visible');
         setTimeout(() => toast.classList.remove('visible'), 3200);
       }
-      // Immediately begin auto-rotation on first open of Zen mode!
       this.startZenAutoRotation();
     } else {
-      // Cleanly exit Zen mode & stop rotation
       this.pauseZenAutoRotation();
       clearTimeout(this.zenInactivityTimer);
       if (toast) toast.classList.remove('visible');
@@ -561,6 +657,11 @@ class App {
 
     this.listeningTarget = { lng, lat, rate, label: locationName };
 
+    // Detect environment (urban, rural, jungle, ocean)
+    const envType = this.classifyLocationEnvironment(lng, lat);
+    this.currentEnv = envType;
+    this.updateEnvironmentBadge(envType);
+
     if (triggerRipple) {
       this.triggerSonarPing(lng, lat);
     }
@@ -575,6 +676,12 @@ class App {
 
     const zoom = this.map ? this.map.getZoom() : 2.5;
     this.sound.updateRain(rate, zoom, true);
+    this.sound.updateAmbience(envType, true);
+
+    // Convective storm lightning strike trigger
+    if (rate >= 18.0) {
+      this.sound.triggerThunderStrike(1.0);
+    }
   }
 
   updateAudioForCurrentTarget() {
@@ -586,6 +693,21 @@ class App {
 
     this.updateHud(rate, rainType, this.listeningTarget.label);
     this.sound.updateRain(rate, zoom, true);
+    this.sound.updateAmbience(this.currentEnv, true);
+
+    // Periodic thunder timer for severe convective cells
+    if (rate >= 16.0 && this.isListening) {
+      if (!this.convectiveThunderTimer) {
+        this.convectiveThunderTimer = setInterval(() => {
+          if (this.isListening && this.listeningTarget && this.listeningTarget.rate >= 16.0) {
+            this.sound.triggerThunderStrike(0.85);
+          }
+        }, 18000);
+      }
+    } else if (this.convectiveThunderTimer) {
+      clearInterval(this.convectiveThunderTimer);
+      this.convectiveThunderTimer = null;
+    }
   }
 
   updateHud(rate, rainType, locationName) {
@@ -617,7 +739,7 @@ class App {
   }
 
   // ==========================================
-  // RAIN TYPE HOVER INFOCARDS
+  // RAIN TYPE HOVER INFOCARDS WITH FLASHCARD WEBP
   // ==========================================
 
   initInfocardHover() {
@@ -649,11 +771,22 @@ class App {
   populateInfocard(rainType, currentRate) {
     if (!this.infocardContainer) return;
 
+    const imgHtml = rainType.image ? `
+      <div class="infocard-img-wrap">
+        <img src="${rainType.image}" alt="${rainType.name}" class="infocard-img" loading="lazy">
+        <div class="infocard-img-overlay">
+          <span class="infocard-img-caption">${rainType.imageCaption || ''}</span>
+        </div>
+      </div>
+    ` : '';
+
     this.infocardContainer.innerHTML = `
       <div class="infocard-header">
         <div class="infocard-badge">${rainType.icon} ${rainType.name}</div>
         <div class="infocard-range">${rainType.rateMin} – ${rainType.rateMax} mm/hr</div>
       </div>
+
+      ${imgHtml}
 
       <div class="infocard-row">
         <span class="info-label">Scientific Class:</span>
@@ -695,6 +828,190 @@ class App {
         <span>Observed: ${(currentRate || 0).toFixed(1)} mm/hr</span>
       </div>
     `;
+  }
+
+  // ==========================================
+  // INTERACTIVE RAIN & GEO QUIZ CONTROLLER
+  // ==========================================
+
+  initQuiz() {
+    const quizBtn = document.getElementById('btn-quiz');
+    const quizPanel = document.getElementById('quiz-panel');
+    const closeBtn = document.getElementById('close-quiz-btn');
+    const nextBtn = document.getElementById('btn-quiz-next');
+    const restartBtn = document.getElementById('btn-quiz-restart');
+    const exploreBtn = document.getElementById('btn-quiz-explore');
+
+    if (quizBtn && quizPanel) {
+      quizBtn.addEventListener('click', () => {
+        const isOpen = quizPanel.classList.toggle('open');
+        quizBtn.classList.toggle('active', isOpen);
+        if (isOpen) {
+          this.renderQuizQuestion(this.quizIndex);
+        }
+      });
+    }
+
+    if (closeBtn && quizPanel) {
+      closeBtn.addEventListener('click', () => {
+        quizPanel.classList.remove('open');
+        quizBtn?.classList.remove('active');
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (this.quizIndex + 1 < QUIZ_QUESTIONS.length) {
+          this.quizIndex++;
+          this.renderQuizQuestion(this.quizIndex);
+        } else {
+          this.showQuizCompletion();
+        }
+      });
+    }
+
+    if (restartBtn) {
+      restartBtn.addEventListener('click', () => {
+        this.quizIndex = 0;
+        this.quizScore = 0;
+        this.renderQuizQuestion(0);
+      });
+    }
+
+    if (exploreBtn) {
+      exploreBtn.addEventListener('click', () => {
+        quizPanel?.classList.remove('open');
+        quizBtn?.classList.remove('active');
+      });
+    }
+  }
+
+  renderQuizQuestion(index) {
+    this.quizAnswered = false;
+    const q = QUIZ_QUESTIONS[index];
+    if (!q) return;
+
+    const catEl = document.getElementById('quiz-category');
+    const counterEl = document.getElementById('quiz-counter');
+    const scoreEl = document.getElementById('quiz-score');
+    const questionTextEl = document.getElementById('quiz-question-text');
+    const optionsContainer = document.getElementById('quiz-options-container');
+    const feedbackCard = document.getElementById('quiz-feedback');
+    const completionCard = document.getElementById('quiz-completion');
+
+    if (catEl) catEl.textContent = q.category;
+    if (counterEl) counterEl.textContent = `Q ${index + 1}/${QUIZ_QUESTIONS.length}`;
+    if (scoreEl) scoreEl.textContent = `Score: ${this.quizScore}`;
+    if (questionTextEl) {
+      questionTextEl.textContent = q.question;
+      questionTextEl.style.display = '';
+    }
+
+    if (feedbackCard) feedbackCard.classList.remove('visible');
+    if (completionCard) completionCard.style.display = 'none';
+
+    if (optionsContainer) {
+      optionsContainer.style.display = '';
+      optionsContainer.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+
+      q.options.forEach((opt, optIdx) => {
+        const btn = document.createElement('button');
+        btn.className = 'quiz-option-btn';
+        btn.innerHTML = `
+          <span class="quiz-opt-letter">${letters[optIdx]}</span>
+          <span class="quiz-opt-text">${opt.text}</span>
+        `;
+        btn.addEventListener('click', () => this.handleQuizAnswer(optIdx, opt, q));
+        optionsContainer.appendChild(btn);
+      });
+    }
+  }
+
+  handleQuizAnswer(selectedIdx, opt, q) {
+    if (this.quizAnswered) return;
+    this.quizAnswered = true;
+
+    const optionsContainer = document.getElementById('quiz-options-container');
+    const btns = optionsContainer ? optionsContainer.querySelectorAll('.quiz-option-btn') : [];
+    btns.forEach((b) => (b.disabled = true));
+
+    const selectedBtn = btns[selectedIdx];
+    const isCorrect = opt.isCorrect;
+
+    if (isCorrect) {
+      this.quizScore++;
+      if (selectedBtn) selectedBtn.classList.add('correct');
+    } else {
+      if (selectedBtn) selectedBtn.classList.add('wrong');
+      // Highlight the correct answer
+      q.options.forEach((o, idx) => {
+        if (o.isCorrect && btns[idx]) {
+          btns[idx].classList.add('correct');
+        }
+      });
+    }
+
+    const scoreEl = document.getElementById('quiz-score');
+    if (scoreEl) scoreEl.textContent = `Score: ${this.quizScore}`;
+
+    // Populate and show feedback card
+    const feedbackCard = document.getElementById('quiz-feedback');
+    const feedbackIcon = document.getElementById('feedback-icon');
+    const feedbackVerdict = document.getElementById('feedback-verdict');
+    const feedbackDest = document.getElementById('feedback-dest');
+    const feedbackExp = document.getElementById('feedback-explanation');
+    const feedbackFact = document.getElementById('feedback-funfact');
+
+    if (feedbackIcon) feedbackIcon.textContent = isCorrect ? '✅' : '❌';
+    if (feedbackVerdict) feedbackVerdict.textContent = isCorrect ? 'Correct! Flying to location...' : 'Incorrect! Flying to location...';
+    if (feedbackDest) feedbackDest.textContent = opt.locationName || opt.text;
+    if (feedbackExp) feedbackExp.textContent = q.explanation;
+    if (feedbackFact) feedbackFact.innerHTML = `💡 <strong>Atmospheric Fact:</strong> ${q.funFact}`;
+
+    if (feedbackCard) feedbackCard.classList.add('visible');
+
+    // Fly camera to the answered location and begin playing live rain acoustics
+    this.lockToLocation(opt.lng, opt.lat, opt.zoom || 6.5, opt.locationName);
+  }
+
+  showQuizCompletion() {
+    const questionTextEl = document.getElementById('quiz-question-text');
+    const optionsContainer = document.getElementById('quiz-options-container');
+    const feedbackCard = document.getElementById('quiz-feedback');
+    const completionCard = document.getElementById('quiz-completion');
+    const completionSummary = document.getElementById('completion-summary');
+    const completionRank = document.getElementById('completion-rank');
+    const completionDesc = document.getElementById('completion-desc');
+
+    if (questionTextEl) questionTextEl.style.display = 'none';
+    if (optionsContainer) optionsContainer.style.display = 'none';
+    if (feedbackCard) feedbackCard.classList.remove('visible');
+
+    const total = QUIZ_QUESTIONS.length;
+    const pct = Math.round((this.quizScore / total) * 100);
+
+    if (completionSummary) {
+      completionSummary.textContent = `You scored ${this.quizScore} out of ${total} (${pct}%)`;
+    }
+
+    if (completionRank && completionDesc) {
+      if (this.quizScore === total) {
+        completionRank.textContent = '🏆 Master Meteorologist';
+        completionDesc.textContent = 'Exceptional understanding! You have mastered Earth\'s extreme precipitation zones, monsoon mechanics, and satellite meteorology.';
+      } else if (this.quizScore >= 4) {
+        completionRank.textContent = '⚡ Atmospheric Explorer';
+        completionDesc.textContent = 'Great intuition for global climates and orographic rainfall patterns across continents!';
+      } else if (this.quizScore >= 2) {
+        completionRank.textContent = '🌧️ Storm Chaser Apprentice';
+        completionDesc.textContent = 'Good start! Explore more regions with Terraphone to discover how mountains and oceans shape Earth\'s storms.';
+      } else {
+        completionRank.textContent = '🌤️ Weather Enthusiast';
+        completionDesc.textContent = 'Keep exploring! Listen to the rain in Cherrapunji, Quibdó, and Bergen to feel the difference.';
+      }
+    }
+
+    if (completionCard) completionCard.style.display = 'flex';
   }
 
   // ==========================================
@@ -765,9 +1082,7 @@ class App {
     let maxRate = 0;
     let bestPixel = null;
 
-    // Scan global raster buffer if ready
     if (this.isRasterReady && this.pixelData) {
-      // Step through with stride 2 for instantaneous scan across ~65k points
       for (let py = 12; py < 500; py += 2) {
         for (let px = 0; px < 512; px += 2) {
           const idx = (py * 512 + px) * 4;
@@ -786,7 +1101,6 @@ class App {
         }
       }
 
-      // Fine-grained refinement in 5x5 window around peak
       if (bestPixel) {
         for (let dy = -2; dy <= 2; dy++) {
           for (let dx = -2; dx <= 2; dx++) {
@@ -811,7 +1125,6 @@ class App {
     let targetLng, targetLat, locationLabel;
 
     if (bestPixel && maxRate >= 0.5) {
-      // Invert Web Mercator pixel coords back to WGS84 lng/lat
       targetLng = (bestPixel.px / 512) * 360 - 180;
       const mercN = (0.5 - bestPixel.py / 512) * (2 * Math.PI);
       const latRad = 2 * (Math.atan(Math.exp(mercN)) - Math.PI / 4);
@@ -821,9 +1134,8 @@ class App {
       const lngStr = `${Math.abs(targetLng).toFixed(1)}°${targetLng >= 0 ? 'E' : 'W'}`;
       locationLabel = `Storm Epicenter (${maxRate.toFixed(1)} mm/hr · ${latStr}, ${lngStr})`;
     } else {
-      // Fallback: Check known global rain hotspots and sample current live rainfall
       let highestObserved = 0;
-      let topSpot = PRESET_HOTSPOTS[0]; // Amazon Basin
+      let topSpot = PRESET_HOTSPOTS[0];
 
       for (const spot of PRESET_HOTSPOTS) {
         const rate = this.sampleRateAt(spot.lng, spot.lat);
@@ -839,7 +1151,6 @@ class App {
       locationLabel = `${topSpot.label} (${maxRate.toFixed(1)} mm/hr)`;
     }
 
-    // Button visual feedback on top button
     const btn = document.getElementById('btn-heaviest');
     if (btn) {
       btn.classList.add('active');
@@ -855,7 +1166,6 @@ class App {
       this.handleZenUserActivity();
     }
 
-    // Smooth orbital camera flyTo to peak rainfall
     this.map.flyTo({
       center: [targetLng, targetLat],
       zoom: 5.2,
@@ -866,7 +1176,6 @@ class App {
       essential: true
     });
 
-    // Start playing audio immediately at the epicenter
     setTimeout(() => {
       this.sound.startAudio();
       this.setListeningPoint(targetLng, targetLat, locationLabel, true);
@@ -874,24 +1183,36 @@ class App {
   }
 
   // ==========================================
-  // AUDIO MIXER & SLIDERS
+  // AUDIO MIXER & 4 SLIDERS
   // ==========================================
 
   initAudioMixer() {
     const rainSlider = document.getElementById('slider-rain-vol');
+    const thunderSlider = document.getElementById('slider-thunder-vol');
+    const ambienceSlider = document.getElementById('slider-ambience-vol');
     const lofiSlider = document.getElementById('slider-lofi-vol');
 
     if (rainSlider) {
       rainSlider.addEventListener('input', (e) => {
-        const v = parseFloat(e.target.value);
-        this.sound.setRainVolume(v);
+        this.sound.setRainVolume(parseFloat(e.target.value));
+      });
+    }
+
+    if (thunderSlider) {
+      thunderSlider.addEventListener('input', (e) => {
+        this.sound.setThunderVolume(parseFloat(e.target.value));
+      });
+    }
+
+    if (ambienceSlider) {
+      ambienceSlider.addEventListener('input', (e) => {
+        this.sound.setAmbienceVolume(parseFloat(e.target.value));
       });
     }
 
     if (lofiSlider) {
       lofiSlider.addEventListener('input', (e) => {
-        const v = parseFloat(e.target.value);
-        this.sound.setLoFiVolume(v);
+        this.sound.setLoFiVolume(parseFloat(e.target.value));
       });
     }
 
@@ -942,7 +1263,6 @@ class App {
   // ==========================================
 
   initControls() {
-    // Initialize controls
     document.getElementById('btn-heaviest')?.addEventListener('click', () => this.flyToHeaviestRainArea());
     document.getElementById('btn-theme')?.addEventListener('click', () => this.cycleTheme());
     document.getElementById('btn-lofi')?.addEventListener('click', () => this.toggleLoFi());
