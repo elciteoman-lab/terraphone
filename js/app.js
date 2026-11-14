@@ -11,7 +11,8 @@ import {
   getRainType,
   PRESET_HOTSPOTS,
   CITIES_DATABASE,
-  QUIZ_QUESTIONS,
+  CITY_NOISE_PROFILES,
+  getLeaderboardCities,
   isCoordinateLand,
   getCityNoiseData
 } from './data.js';
@@ -39,8 +40,9 @@ class App {
     this.isTerrainEnabled = true;
     this.bumpLevel = 2.6;
 
-    // Current city noise pollution profile
+    // Current city noise pollution profile & popup
     this.currentNoiseData = null;
+    this.cityPopup = null;
 
     // Listening & Target state
     this.isListening = false;
@@ -48,7 +50,7 @@ class App {
     this.crosshairMarker = null;
     this.crosshairEl = null;
     this.currentEnv = 'rural';
-    this.activeRainLayerId = 'IMERG_Precipitation_Rate_30min';
+    this.activeRainLayerId = 'IMERG_Precipitation_Rate';
     this.convectiveThunderTimer = null;
 
     // High-performance CPU-cached precipitation buffer (zero GPU readbacks)
@@ -67,13 +69,8 @@ class App {
     this.isZenMode = false;
     this.isAutoRotating = false;
     this.autoRotateRaf = null;
-    this.autoRotateSpeed = 0.055; // Smooth degrees per frame
+    this.autoRotateDegPerSec = 3.3; // Delta-time calibrated: 3.3 deg/sec (~109s full revolution, FPS-independent)
     this.zenInactivityTimer = null;
-
-    // Quiz state
-    this.quizIndex = 0;
-    this.quizScore = 0;
-    this.quizAnswered = false;
 
     // UI elements
     this.cursorTracker = document.getElementById('cursor-tracker');
@@ -94,7 +91,7 @@ class App {
     this.initAudioMixer();
     this.initControls();
     this.initSearch();
-    this.initQuiz();
+    this.initLeaderboard();
     this.initInfocardHover();
     this.loadGlobalPrecipitationBuffer();
   }
@@ -164,7 +161,7 @@ class App {
 
   initMap() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const rainWms = this.buildWmsUrl(this.activeRainLayerId);
+    const rainWmts = this.buildWmtsUrl(this.activeRainLayerId);
 
     // Globe starts centered symmetrically at pitch 0 for wobble-free rotation
     this.map = new maplibregl.Map({
@@ -192,12 +189,12 @@ class App {
             maxzoom: 12,
             attribution: 'AWS Open Data Elevation'
           },
-          // 3. NASA GIBS Live GPM IMERG Precipitation Overlay
+          // 3. NASA GIBS Live GPM IMERG Precipitation Overlay (WMTS GoogleMapsCompatible_Level6 Grid)
           'rain-source': {
             type: 'raster',
-            tiles: [rainWms],
+            tiles: [rainWmts],
             tileSize: 256,
-            maxzoom: 8,
+            maxzoom: 6,
             attribution: 'NASA GIBS GPM IMERG'
           }
         },
@@ -238,10 +235,10 @@ class App {
             type: 'raster',
             source: 'rain-source',
             paint: {
-              'raster-opacity': 0.38,
+              'raster-opacity': 0.42,
               'raster-fade-duration': 200,
-              'raster-brightness-max': 0.10,
-              'raster-contrast': 0.55,
+              'raster-brightness-max': 0.08,
+              'raster-contrast': 0.50,
               'raster-saturation': -1.0,
               'raster-resampling': 'linear'
             }
@@ -252,11 +249,12 @@ class App {
             type: 'raster',
             source: 'rain-source',
             paint: {
-              'raster-opacity': 0.90,
+              'raster-opacity': 0.88,
               'raster-fade-duration': 200,
+              'raster-brightness-min': 0.18,
               'raster-brightness-max': 1.0,
-              'raster-contrast': 0.35,
-              'raster-saturation': 0.12,
+              'raster-contrast': 0.65,
+              'raster-saturation': -0.75,
               'raster-resampling': 'linear'
             }
           }
@@ -284,6 +282,7 @@ class App {
     this.map.on('style.load', () => {
       this.applyTerrainBumpiness();
       this.applyEffectiveTheme();
+      this.initCityMarkers();
     });
 
     // Zoom listener for altitude-dependent acoustics
@@ -335,11 +334,11 @@ class App {
 
       try {
         if (this.map && this.map.getLayer('cloud-deck-layer')) {
-          this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.85);
+          this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.95);
           setTimeout(() => {
             try {
               if (this.map && this.map.getLayer('cloud-deck-layer')) {
-                this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.35);
+                this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.65);
               }
             } catch (e) {}
           }, 200);
@@ -351,10 +350,10 @@ class App {
     setInterval(() => this.refreshRainLayer(), 10 * 60 * 1000);
   }
 
-  buildWmsUrl(layerId) {
-    return `https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${encodeURIComponent(
+  buildWmtsUrl(layerId = 'IMERG_Precipitation_Rate') {
+    return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/wmts.cgi?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${encodeURIComponent(
       layerId
-    )}&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=512&HEIGHT=512&FORMAT=image/png&TRANSPARENT=TRUE`;
+    )}&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible_Level6&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image/png`;
   }
 
   updateMapThemeStyles(theme) {
@@ -572,12 +571,18 @@ class App {
   startZenAutoRotation() {
     if (this.isAutoRotating) return;
     this.isAutoRotating = true;
+    let lastTime = performance.now();
 
-    const rotateStep = () => {
+    const rotateStep = (timestamp) => {
       if (!this.isAutoRotating || !this.map || !this.isZenMode) return;
+      const now = timestamp || performance.now();
+      const deltaSec = Math.min((now - lastTime) / 1000, 0.1); // Clamp to max 100ms to prevent jump on tab focus
+      lastTime = now;
+
       const center = this.map.getCenter();
-      let newLng = center.lng + this.autoRotateSpeed;
+      let newLng = center.lng + (this.autoRotateDegPerSec * deltaSec);
       if (newLng > 180) newLng -= 360;
+      if (newLng < -180) newLng += 360;
 
       this.map.setCenter([newLng, center.lat]);
       this.autoRotateRaf = requestAnimationFrame(rotateStep);
@@ -961,187 +966,240 @@ class App {
   }
 
   // ==========================================
-  // INTERACTIVE RAIN & GEO QUIZ CONTROLLER
+  // GLOBAL URBAN NOISE LEADERBOARD CONTROLLER
   // ==========================================
 
-  initQuiz() {
-    const quizBtn = document.getElementById('btn-quiz');
-    const quizPanel = document.getElementById('quiz-panel');
-    const closeBtn = document.getElementById('close-quiz-btn');
-    const nextBtn = document.getElementById('btn-quiz-next');
-    const restartBtn = document.getElementById('btn-quiz-restart');
-    const exploreBtn = document.getElementById('btn-quiz-explore');
+  initLeaderboard() {
+    const leaderboardBtn = document.getElementById('btn-leaderboard');
+    const modal = document.getElementById('leaderboard-modal');
+    const closeBtn = document.getElementById('close-leaderboard-modal');
 
-    if (quizBtn && quizPanel) {
-      quizBtn.addEventListener('click', () => {
-        const isOpen = quizPanel.classList.toggle('open');
-        quizBtn.classList.toggle('active', isOpen);
-        if (isOpen) {
-          this.renderQuizQuestion(this.quizIndex);
-        }
+    if (leaderboardBtn && modal) {
+      leaderboardBtn.addEventListener('click', () => {
+        this.renderLeaderboardList();
+        modal.classList.add('open');
       });
     }
 
-    if (closeBtn && quizPanel) {
+    if (closeBtn && modal) {
       closeBtn.addEventListener('click', () => {
-        quizPanel.classList.remove('open');
-        quizBtn?.classList.remove('active');
+        modal.classList.remove('open');
       });
     }
 
-    if (nextBtn) {
-      nextBtn.addEventListener('click', () => {
-        if (this.quizIndex + 1 < QUIZ_QUESTIONS.length) {
-          this.quizIndex++;
-          this.renderQuizQuestion(this.quizIndex);
-        } else {
-          this.showQuizCompletion();
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.remove('open');
+      });
+    }
+  }
+
+  renderLeaderboardList() {
+    const listContainer = document.getElementById('leaderboard-list');
+    const modal = document.getElementById('leaderboard-modal');
+    if (!listContainer) return;
+
+    const cities = getLeaderboardCities();
+    listContainer.innerHTML = '';
+
+    cities.forEach((city) => {
+      const item = document.createElement('div');
+      item.className = 'leaderboard-item';
+
+      let rankClass = 'rank-low';
+      if (city.rank <= 4) rankClass = 'rank-extreme';
+      else if (city.rank <= 12) rankClass = 'rank-severe';
+      else if (city.rank <= 19) rankClass = 'rank-high';
+
+      // Scale 50 dBA -> 120 dBA
+      const pct = Math.max(10, Math.min(100, Math.round(((city.dBA - 50) / 70) * 100)));
+
+      item.innerHTML = `
+        <div class="leaderboard-left">
+          <span class="leaderboard-rank-pill ${rankClass}">#${city.rank}</span>
+          <div class="leaderboard-city-info">
+            <span class="leaderboard-city-name">${city.name}</span>
+            <span class="leaderboard-city-sub">${city.country} · ${city.level}</span>
+          </div>
+        </div>
+        <div class="leaderboard-right">
+          <div class="leaderboard-meter-wrap">
+            <span class="leaderboard-db-pill" style="color:${city.color}">
+              ${city.dBA}<span class="leaderboard-db-unit">dBA</span>
+            </span>
+            <div class="leaderboard-mini-track">
+              <div class="leaderboard-mini-fill" style="width:${pct}%; background:${city.color};"></div>
+            </div>
+          </div>
+          <button class="leaderboard-action-btn" title="Travel to ${city.name}">
+            <span>Travel</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      `;
+
+      item.addEventListener('click', () => {
+        modal?.classList.remove('open');
+        this.lockToLocation(city.lng, city.lat, 6.0, `${city.name}, ${city.country}`);
+        if (city.soundType) {
+          this.sound.triggerCitySignature(city.soundType);
+        }
+        setTimeout(() => this.openNoiseModal(city), 600);
+      });
+
+      listContainer.appendChild(item);
+    });
+  }
+
+  // ==========================================
+  // 3D GLOBE CITY MARKERS & ACOUSTIC INDICATORS
+  // ==========================================
+
+  initCityMarkers() {
+    if (!this.map) return;
+
+    const features = [];
+    const addedNames = new Set();
+
+    // 1. Noise ranked cities first
+    for (const [key, profile] of Object.entries(CITY_NOISE_PROFILES)) {
+      addedNames.add(profile.name.toLowerCase());
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [profile.lng, profile.lat]
+        },
+        properties: {
+          name: profile.name,
+          country: profile.country,
+          isNoiseRanked: true,
+          rank: profile.rank,
+          dBA: profile.dBA,
+          level: profile.level,
+          soundType: profile.soundType || key
         }
       });
     }
 
-    if (restartBtn) {
-      restartBtn.addEventListener('click', () => {
-        this.quizIndex = 0;
-        this.quizScore = 0;
-        this.renderQuizQuestion(0);
-      });
-    }
-
-    if (exploreBtn) {
-      exploreBtn.addEventListener('click', () => {
-        quizPanel?.classList.remove('open');
-        quizBtn?.classList.remove('active');
-      });
-    }
-  }
-
-  renderQuizQuestion(index) {
-    this.quizAnswered = false;
-    const q = QUIZ_QUESTIONS[index];
-    if (!q) return;
-
-    const catEl = document.getElementById('quiz-category');
-    const counterEl = document.getElementById('quiz-counter');
-    const scoreEl = document.getElementById('quiz-score');
-    const questionTextEl = document.getElementById('quiz-question-text');
-    const optionsContainer = document.getElementById('quiz-options-container');
-    const feedbackCard = document.getElementById('quiz-feedback');
-    const completionCard = document.getElementById('quiz-completion');
-
-    if (catEl) catEl.textContent = q.category;
-    if (counterEl) counterEl.textContent = `Q ${index + 1}/${QUIZ_QUESTIONS.length}`;
-    if (scoreEl) scoreEl.textContent = `Score: ${this.quizScore}`;
-    if (questionTextEl) {
-      questionTextEl.textContent = q.question;
-      questionTextEl.style.display = '';
-    }
-
-    if (feedbackCard) feedbackCard.classList.remove('visible');
-    if (completionCard) completionCard.style.display = 'none';
-
-    if (optionsContainer) {
-      optionsContainer.style.display = '';
-      optionsContainer.innerHTML = '';
-      const letters = ['A', 'B', 'C', 'D'];
-
-      q.options.forEach((opt, optIdx) => {
-        const btn = document.createElement('button');
-        btn.className = 'quiz-option-btn';
-        btn.innerHTML = `
-          <span class="quiz-opt-letter">${letters[optIdx]}</span>
-          <span class="quiz-opt-text">${opt.text}</span>
-        `;
-        btn.addEventListener('click', () => this.handleQuizAnswer(optIdx, opt, q));
-        optionsContainer.appendChild(btn);
-      });
-    }
-  }
-
-  handleQuizAnswer(selectedIdx, opt, q) {
-    if (this.quizAnswered) return;
-    this.quizAnswered = true;
-
-    const optionsContainer = document.getElementById('quiz-options-container');
-    const btns = optionsContainer ? optionsContainer.querySelectorAll('.quiz-option-btn') : [];
-    btns.forEach((b) => (b.disabled = true));
-
-    const selectedBtn = btns[selectedIdx];
-    const isCorrect = opt.isCorrect;
-
-    if (isCorrect) {
-      this.quizScore++;
-      if (selectedBtn) selectedBtn.classList.add('correct');
-    } else {
-      if (selectedBtn) selectedBtn.classList.add('wrong');
-      // Highlight the correct answer
-      q.options.forEach((o, idx) => {
-        if (o.isCorrect && btns[idx]) {
-          btns[idx].classList.add('correct');
+    // 2. All 130+ metropolises and capitals from CITIES_DATABASE
+    for (const city of CITIES_DATABASE) {
+      if (addedNames.has(city.name.toLowerCase())) continue;
+      addedNames.add(city.name.toLowerCase());
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [city.lng, city.lat]
+        },
+        properties: {
+          name: city.name,
+          country: city.country,
+          isNoiseRanked: false,
+          category: city.cat || 'Metropolis',
+          pop: city.pop || ''
         }
       });
     }
 
-    const scoreEl = document.getElementById('quiz-score');
-    if (scoreEl) scoreEl.textContent = `Score: ${this.quizScore}`;
+    const geojsonData = {
+      type: 'FeatureCollection',
+      features
+    };
 
-    // Populate and show feedback card
-    const feedbackCard = document.getElementById('quiz-feedback');
-    const feedbackIcon = document.getElementById('feedback-icon');
-    const feedbackVerdict = document.getElementById('feedback-verdict');
-    const feedbackDest = document.getElementById('feedback-dest');
-    const feedbackExp = document.getElementById('feedback-explanation');
-    const feedbackFact = document.getElementById('feedback-funfact');
-
-    if (feedbackIcon) feedbackIcon.textContent = isCorrect ? '✅' : '❌';
-    if (feedbackVerdict) feedbackVerdict.textContent = isCorrect ? 'Correct! Flying to location...' : 'Incorrect! Flying to location...';
-    if (feedbackDest) feedbackDest.textContent = opt.locationName || opt.text;
-    if (feedbackExp) feedbackExp.textContent = q.explanation;
-    if (feedbackFact) feedbackFact.innerHTML = `💡 <strong>Atmospheric Fact:</strong> ${q.funFact}`;
-
-    if (feedbackCard) feedbackCard.classList.add('visible');
-
-    // Fly camera to the answered location and begin playing live rain acoustics
-    this.lockToLocation(opt.lng, opt.lat, opt.zoom || 6.5, opt.locationName);
-  }
-
-  showQuizCompletion() {
-    const questionTextEl = document.getElementById('quiz-question-text');
-    const optionsContainer = document.getElementById('quiz-options-container');
-    const feedbackCard = document.getElementById('quiz-feedback');
-    const completionCard = document.getElementById('quiz-completion');
-    const completionSummary = document.getElementById('completion-summary');
-    const completionRank = document.getElementById('completion-rank');
-    const completionDesc = document.getElementById('completion-desc');
-
-    if (questionTextEl) questionTextEl.style.display = 'none';
-    if (optionsContainer) optionsContainer.style.display = 'none';
-    if (feedbackCard) feedbackCard.classList.remove('visible');
-
-    const total = QUIZ_QUESTIONS.length;
-    const pct = Math.round((this.quizScore / total) * 100);
-
-    if (completionSummary) {
-      completionSummary.textContent = `You scored ${this.quizScore} out of ${total} (${pct}%)`;
+    if (this.map.getSource('cities-source')) {
+      this.map.getSource('cities-source').setData(geojsonData);
+      return;
     }
 
-    if (completionRank && completionDesc) {
-      if (this.quizScore === total) {
-        completionRank.textContent = '🏆 Master Meteorologist';
-        completionDesc.textContent = 'Exceptional understanding! You have mastered Earth\'s extreme precipitation zones, monsoon mechanics, and satellite meteorology.';
-      } else if (this.quizScore >= 4) {
-        completionRank.textContent = '⚡ Atmospheric Explorer';
-        completionDesc.textContent = 'Great intuition for global climates and orographic rainfall patterns across continents!';
-      } else if (this.quizScore >= 2) {
-        completionRank.textContent = '🌧️ Storm Chaser Apprentice';
-        completionDesc.textContent = 'Good start! Explore more regions with Terraphone to discover how mountains and oceans shape Earth\'s storms.';
-      } else {
-        completionRank.textContent = '🌤️ Weather Enthusiast';
-        completionDesc.textContent = 'Keep exploring! Listen to the rain in Cherrapunji, Quibdó, and Bergen to feel the difference.';
+    this.map.addSource('cities-source', {
+      type: 'geojson',
+      data: geojsonData
+    });
+
+    // Outer soft glow halo
+    this.map.addLayer({
+      id: 'cities-glow',
+      type: 'circle',
+      source: 'cities-source',
+      paint: {
+        'circle-radius': ['case', ['get', 'isNoiseRanked'], 8.5, 5.0],
+        'circle-color': ['case', ['get', 'isNoiseRanked'], '#ef4444', '#38bdf8'],
+        'circle-opacity': 0.38,
+        'circle-blur': 0.8
       }
-    }
+    });
 
-    if (completionCard) completionCard.style.display = 'flex';
+    // Inner crisp dot
+    this.map.addLayer({
+      id: 'cities-dots',
+      type: 'circle',
+      source: 'cities-source',
+      paint: {
+        'circle-radius': ['case', ['get', 'isNoiseRanked'], 4.5, 3.2],
+        'circle-color': ['case', ['get', 'isNoiseRanked'], '#ef4444', '#f8fafc'],
+        'circle-stroke-width': 1.5,
+        'circle-stroke-color': '#070b14'
+      }
+    });
+
+    // Floating Popup
+    this.cityPopup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 10
+    });
+
+    this.map.on('mouseenter', 'cities-dots', (e) => {
+      this.map.getCanvas().style.cursor = 'pointer';
+      if (!e.features || !e.features.length) return;
+      const f = e.features[0];
+      const coords = f.geometry.coordinates.slice();
+      const p = f.properties;
+
+      let badgeHtml = '';
+      if (p.isNoiseRanked) {
+        badgeHtml = `<span class="city-popup-badge ranked">🔊 Noise Rank #${p.rank} · ${p.dBA} dBA</span>`;
+      } else {
+        badgeHtml = `<span class="city-popup-badge metro">📍 ${p.category || 'City'}</span>`;
+      }
+
+      const content = `
+        <div class="city-popup">
+          <div class="city-popup-title">${p.name}, ${p.country}</div>
+          ${badgeHtml}
+          <div class="city-popup-hint">Click to listen & explore</div>
+        </div>
+      `;
+
+      this.cityPopup.setLngLat(coords).setHTML(content).addTo(this.map);
+    });
+
+    this.map.on('mouseleave', 'cities-dots', () => {
+      this.map.getCanvas().style.cursor = '';
+      this.cityPopup.remove();
+    });
+
+    this.map.on('click', 'cities-dots', (e) => {
+      if (!e.features || !e.features.length) return;
+      const f = e.features[0];
+      const coords = f.geometry.coordinates;
+      const p = f.properties;
+
+      this.cityPopup.remove();
+      this.lockToLocation(coords[0], coords[1], 6.2, `${p.name}, ${p.country}`);
+
+      if (p.soundType) {
+        this.sound.triggerCitySignature(p.soundType);
+      }
+
+      if (p.isNoiseRanked) {
+        const noiseData = getCityNoiseData(p.name, coords[0], coords[1]);
+        if (noiseData) {
+          setTimeout(() => this.openNoiseModal(noiseData), 600);
+        }
+      }
+    });
   }
 
   // ==========================================
@@ -1168,10 +1226,6 @@ class App {
       } else if (e.key === 'h' || e.key === 'H') {
         if (document.activeElement !== searchInput) {
           this.toggleUiVisibility();
-        }
-      } else if (e.key === 'l' || e.key === 'L') {
-        if (document.activeElement !== searchInput) {
-          this.toggleLoFi();
         }
       } else if (e.key === ' ' && document.activeElement !== searchInput) {
         e.preventDefault();
@@ -1359,16 +1413,6 @@ class App {
     }
   }
 
-  toggleLoFi() {
-    const nextState = !this.sound.lofiEnabled;
-    this.sound.setLoFi(nextState);
-
-    const btn = document.getElementById('btn-lofi');
-    if (btn) {
-      btn.classList.toggle('active', nextState);
-    }
-  }
-
   togglePlayback() {
     if (!this.isListening) {
       const center = this.map ? this.map.getCenter() : { lng: -60, lat: -3 };
@@ -1416,14 +1460,9 @@ class App {
     }
   }
 
-  // ==========================================
-  // CONTROLS & MODALS
-  // ==========================================
-
   initControls() {
     document.getElementById('btn-heaviest')?.addEventListener('click', () => this.flyToHeaviestRainArea());
     document.getElementById('btn-theme')?.addEventListener('click', () => this.cycleTheme());
-    document.getElementById('btn-lofi')?.addEventListener('click', () => this.toggleLoFi());
     document.getElementById('btn-listen')?.addEventListener('click', () => this.togglePlayback());
     document.getElementById('btn-hide-ui')?.addEventListener('click', () => this.toggleUiVisibility());
     document.getElementById('btn-fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
@@ -1476,7 +1515,7 @@ class App {
   refreshRainLayer() {
     if (!this.map || !this.map.getSource('rain-source')) return;
     try {
-      const newUrl = this.buildWmsUrl(this.activeRainLayerId) + `&_t=${Date.now()}`;
+      const newUrl = this.buildWmtsUrl(this.activeRainLayerId) + `&_t=${Date.now()}`;
       this.map.getSource('rain-source').setTiles([newUrl]);
       this.loadGlobalPrecipitationBuffer();
     } catch (e) {

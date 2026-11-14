@@ -14,7 +14,7 @@ export class SoundEngine {
     this.rainVolume = 0.85;
     this.thunderVolume = 0.80;
     this.ambienceVolume = 0.70;
-    this.lofiVolume = 0.55;
+    this.lofiVolume = 0.0; // Lo-Fi starts at 0 (controlled by bottom-right slider)
 
     // Audio Elements, Web Audio Sources & Gains
     this.audioElements = {};
@@ -118,8 +118,8 @@ export class SoundEngine {
     this.loadAudioTrack('ambience_jungle', 'audio/ambience_jungle.ogg', this.ambienceMaster);
     this.loadAudioTrack('ambience_ocean', 'audio/ambience_ocean.ogg', this.ambienceMaster);
 
-    // Load Lo-Fi Chillhop Track
-    this.loadAudioTrack('lofi_beat', 'audio/lofi_cold_rainy.ogg', this.lofiMaster);
+    // Load Lo-Fi Chillhop Track (Clean chillhop beat with zero rain baked in)
+    this.loadAudioTrack('lofi_beat', 'audio/lofi_cloud_watching.ogg', this.lofiMaster);
 
     this.startVisualizerTicker();
   }
@@ -511,6 +511,101 @@ export class SoundEngine {
         break;
       }
 
+      // 9. Madrid: Historic Puerta del Sol clock bell chime & scooter chirp
+      case 'madrid': {
+        // Bell chime D5 (587Hz) with gentle overtone
+        const { osc: o1, gain: g1 } = createOsc(587.33, 'sine');
+        const { osc: o2 } = createOsc(1174.66, 'sine');
+        o2.disconnect();
+        o2.connect(g1);
+        g1.gain.setValueAtTime(0, now);
+        g1.gain.linearRampToValueAtTime(0.16, now + 0.02);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+        o1.start(now);
+        o2.start(now);
+        o1.stop(now + 1.5);
+        o2.stop(now + 1.5);
+
+        // Light moped/scooter beep at +0.35s
+        setTimeout(() => {
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const { osc: o3, gain: g3 } = createOsc(740, 'triangle');
+          g3.gain.setValueAtTime(0, t);
+          g3.gain.linearRampToValueAtTime(0.12, t + 0.02);
+          g3.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          o3.start(t);
+          o3.stop(t + 0.20);
+        }, 350);
+        break;
+      }
+
+      // 10. Mumbai: Auto-rickshaw rhythmic dual-tone warning
+      case 'mumbai': {
+        const honk = (tOffset, pitch) => {
+          const t = now + tOffset;
+          const { osc: o, gain: g } = createOsc(pitch, 'sawtooth');
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(950, t);
+          filter.Q.setValueAtTime(2.2, t);
+          o.disconnect();
+          o.connect(filter);
+          filter.connect(g);
+
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.19, t + 0.03);
+          g.gain.linearRampToValueAtTime(0.19, t + 0.14);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+          o.start(t);
+          o.stop(t + 0.24);
+        };
+        honk(0, 480);
+        honk(0.16, 520);
+        break;
+      }
+
+      // 11. Rome: Classic Vespa high-pitch horn double-toot
+      case 'rome': {
+        const toot = (tOffset) => {
+          const t = now + tOffset;
+          const { osc: o, gain: g } = createOsc(660, 'sawtooth');
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(1400, t);
+          o.disconnect();
+          o.connect(filter);
+          filter.connect(g);
+
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.15, t + 0.02);
+          g.gain.linearRampToValueAtTime(0.15, t + 0.10);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          o.start(t);
+          o.stop(t + 0.20);
+        };
+        toot(0);
+        toot(0.14);
+        break;
+      }
+
+      // 12. Barcelona: Metro / modern tram chime
+      case 'barcelona': {
+        const chime = (tOffset, freq) => {
+          const t = now + tOffset;
+          const { osc: o, gain: g } = createOsc(freq, 'sine');
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.12, t + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.40);
+          o.start(t);
+          o.stop(t + 0.42);
+        };
+        chime(0, 1046.5); // C6
+        chime(0.15, 1318.5); // E6
+        chime(0.30, 1567.98); // G6
+        break;
+      }
+
       default:
         break;
     }
@@ -619,8 +714,25 @@ export class SoundEngine {
 
   setLoFiVolume(v) {
     this.lofiVolume = Math.max(0, Math.min(1, v));
-    if (this.ctx && this.lofiEnabled && !this.isMuted) {
-      this.lofiMaster.gain.setTargetAtTime(this.lofiVolume, this.ctx.currentTime, 0.08);
+    this.lofiEnabled = this.lofiVolume > 0.001;
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const lofiEl = this.audioElements['lofi_beat'];
+    const gainNode = this.gains['lofi_beat'];
+
+    if (this.lofiEnabled && !this.isMuted) {
+      if (lofiEl && lofiEl.paused) {
+        lofiEl.play().catch(() => {});
+      }
+      this.lofiMaster.gain.setTargetAtTime(this.lofiVolume, now, 0.08);
+      if (gainNode) gainNode.gain.setTargetAtTime(1.0, now, 0.08);
+    } else {
+      this.lofiMaster.gain.setTargetAtTime(0, now, 0.08);
+      if (this.lofiVolume <= 0.001 && lofiEl && !lofiEl.paused) {
+        setTimeout(() => {
+          if (this.lofiVolume <= 0.001 && lofiEl) lofiEl.pause();
+        }, 300);
+      }
     }
   }
 
