@@ -19,6 +19,8 @@ import {
 import { SoundEngine } from './audio.js';
 import { SearchController } from './search.js';
 import { SoundOfChangeEngine } from './sound-of-change.js';
+import { ArcadeHub } from './arcade/arcade-hub.js';
+import { arcadeTokens } from './arcade/arcade-tokens.js';
 
 // Free Public Basemaps: Physical Elevation-Colored Topography (No API Keys)
 const BASEMAP_TILES = {
@@ -87,9 +89,10 @@ class App {
     this.hudStatus = document.getElementById('hud-status');
     this.infocardContainer = document.getElementById('rain-infocard');
 
-    // Experience views ('rain' | 'sound-of-change')
+    // Experience views ('rain' | 'sound-of-change' | 'arcade')
     this.currentView = 'rain';
     this.soundOfChange = new SoundOfChangeEngine(this.sound.ctx);
+    this.arcade = null;
 
     this.initTheme();
     this.initMap();
@@ -101,6 +104,7 @@ class App {
     this.initStarsBackground();
     this.initMobileUI();
     this.initSoundOfChange();
+    this.initArcade();
     this.initNavigation();
     this.loadGlobalPrecipitationBuffer();
   }
@@ -682,11 +686,27 @@ class App {
         setTimeout(() => toast.classList.remove('visible'), 3600);
       }
       this.startZenAutoRotation();
+
+      // Zen Token Economy: 1 token accrued per active minute in Zen mode (up to daily cap)
+      if (this.zenTokenInterval) clearInterval(this.zenTokenInterval);
+      this.zenTokenInterval = setInterval(() => {
+        if (this.isZenMode && document.visibilityState === 'visible') {
+          arcadeTokens.recordZenMinute();
+        }
+      }, 60000);
     } else {
       this.pauseZenAutoRotation();
       clearTimeout(this.zenInactivityTimer);
+      if (this.zenTokenInterval) {
+        clearInterval(this.zenTokenInterval);
+        this.zenTokenInterval = null;
+      }
       if (toast) toast.classList.remove('visible');
     }
+  }
+
+  toggleZenMode() {
+    this.toggleUiVisibility();
   }
 
   // ==========================================
@@ -1328,6 +1348,10 @@ class App {
           this.toggleUiVisibility();
         }
       } else if (e.key === ' ' && document.activeElement !== searchInput && document.activeElement.tagName !== 'BUTTON') {
+        if (this.currentView === 'arcade') {
+          // Allow arcade games to consume spacebar for jump / boost / cruise
+          return;
+        }
         e.preventDefault();
         if (this.currentView === 'sound-of-change') {
           this.soundOfChange?.toggleAudio();
@@ -1335,8 +1359,21 @@ class App {
           this.togglePlayback();
         }
       } else if ((e.key === 'c' || e.key === 'C') && document.activeElement !== searchInput) {
+        if (this.currentView === 'arcade') {
+          // Rainway uses 'C' for camera toggle
+          return;
+        }
         this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');
+      } else if ((e.key === 'a' || e.key === 'A') && document.activeElement !== searchInput) {
+        if (this.currentView === 'arcade' && this.arcade?.activeGameInstance) {
+          // Game movement takes priority
+          return;
+        }
+        this.switchExperience(this.currentView === 'arcade' ? 'rain' : 'arcade');
       } else if ((e.key === 's' || e.key === 'S') && document.activeElement !== searchInput) {
+        if (this.currentView === 'arcade') {
+          return;
+        }
         if (this.currentView === 'sound-of-change') {
           this.switchExperience('rain');
         }
@@ -1605,10 +1642,14 @@ class App {
 
   initNavigation() {
     const btnSoc = document.getElementById('btn-sound-of-change');
+    const btnArcade = document.getElementById('btn-arcade');
     const brand = document.getElementById('btn-brand');
 
     btnSoc?.addEventListener('click', () => {
-      this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');
+      this.switchExperience(this.currentView === 'sound-of-change' ? 'rain' : 'sound-of-change');
+    });
+    btnArcade?.addEventListener('click', () => {
+      this.switchExperience(this.currentView === 'arcade' ? 'rain' : 'arcade');
     });
     brand?.addEventListener('click', () => {
       this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');
@@ -1619,6 +1660,8 @@ class App {
       const hash = window.location.hash.toLowerCase();
       if (hash === '#sound-of-change' || hash === '#change' || hash === '#interventions') {
         this.switchExperience('sound-of-change', false);
+      } else if (hash === '#arcade' || hash.startsWith('#arcade/')) {
+        this.switchExperience('arcade', false);
       } else if (hash === '#rain' || hash === '#globe') {
         this.switchExperience('rain', false);
       } else if (hash === '#about') {
@@ -1635,7 +1678,9 @@ class App {
     this.currentView = viewName;
 
     const btnSoc = document.getElementById('btn-sound-of-change');
+    const btnArcade = document.getElementById('btn-arcade');
     const socView = document.getElementById('sound-of-change-view');
+    const arcadeView = document.getElementById('arcade-view');
     const rainCapsules = [
       document.getElementById('hud-top-center'),
       document.getElementById('hud-bottom-left'),
@@ -1644,57 +1689,60 @@ class App {
     ];
 
     if (viewName === 'sound-of-change') {
-      // Switch active button styling
       btnSoc?.classList.add('active');
+      btnArcade?.classList.remove('active');
 
-      // Make sure AudioContext is initialized from user action
-      if (!this.sound.ctx) {
-        this.sound.init();
+      if (!this.sound.ctx) this.sound.init();
+
+      rainCapsules.forEach(el => { if (el) el.style.display = 'none'; });
+      arcadeView?.classList.remove('active');
+      this.arcade?.closeActiveGame();
+
+      socView?.classList.add('active');
+      if (this.isListening) {
+        this.sound.updateRain(0, this.sound.currentZoom, false);
+      }
+      this.soundOfChange?.initVideo();
+
+      if (updateHash) window.history.replaceState(null, '', '#sound-of-change');
+    } else if (viewName === 'arcade') {
+      btnArcade?.classList.add('active');
+      btnSoc?.classList.remove('active');
+
+      if (!this.sound.ctx) this.sound.init();
+      if (this.arcade && this.sound.ctx) {
+        this.arcade.audioCtx = this.sound.ctx;
       }
 
-      // Hide rain-specific UI capsules
-      rainCapsules.forEach(el => {
-        if (el) el.style.display = 'none';
-      });
+      rainCapsules.forEach(el => { if (el) el.style.display = 'none'; });
+      socView?.classList.remove('active');
+      this.soundOfChange?.pauseAudio();
 
-      // Show Sound of Change view
-      socView?.classList.add('active');
-
-      // Temporarily lower or pause rain audio
+      arcadeView?.classList.add('active');
       if (this.isListening) {
         this.sound.updateRain(0, this.sound.currentZoom, false);
       }
 
-      // Start videos
-      this.soundOfChange?.initVideo();
-
-      if (updateHash) {
-        window.history.replaceState(null, '', '#sound-of-change');
-      }
+      if (updateHash) window.history.replaceState(null, '', '#arcade');
     } else {
-      // Switch to Global Rain
+      // Global Rain
       btnSoc?.classList.remove('active');
+      btnArcade?.classList.remove('active');
 
-      // Hide Sound of Change view
       socView?.classList.remove('active');
-
-      // Restore rain UI capsules
-      rainCapsules.forEach(el => {
-        if (el) el.style.display = '';
-      });
-
-      // Pause Sound of Change audio
       this.soundOfChange?.pauseAudio();
 
-      // Resume rain audio if user was in listening state
+      arcadeView?.classList.remove('active');
+      this.arcade?.closeActiveGame();
+
+      rainCapsules.forEach(el => { if (el) el.style.display = ''; });
+
       if (this.isListening && this.listeningTarget) {
         this.sound.updateRain(this.listeningTarget.rate, this.map ? this.map.getZoom() : 2.5, true);
         this.sound.updateAmbience(this.currentEnv, true);
       }
 
-      if (updateHash) {
-        window.history.replaceState(null, '', '#rain');
-      }
+      if (updateHash) window.history.replaceState(null, '', '#rain');
     }
   }
 
@@ -1702,6 +1750,12 @@ class App {
     const socContainer = document.getElementById('sound-of-change-view');
     if (!socContainer) return;
     this.soundOfChange.mount(socContainer, this.sound.ctx);
+  }
+
+  initArcade() {
+    const arcadeContainer = document.getElementById('arcade-view');
+    if (!arcadeContainer) return;
+    this.arcade = new ArcadeHub(arcadeContainer, this.sound.ctx);
   }
 
   // ==========================================
