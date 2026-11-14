@@ -35,7 +35,9 @@
   <!-- 3D Bumpy Globe Map Container -->
   <div id="map"></div>
   <div id="lightning-overlay" class="lightning-flash-overlay"></div>
-  <div class="stars-overlay"></div>
+  <div class="stars-overlay" id="stars-overlay">
+    <canvas id="stars-canvas"></canvas>
+  </div>
 
   <!-- ==========================================
        TOP LEFT: BRAND & NASA SVS 5650 CAPSULE
@@ -87,7 +89,7 @@
       <span id="theme-label">Auto</span>
     </button>
 
-    <!-- Global Noise Leaderboard Button -->
+    <!-- Global Noise Leaderboard Button (Clean single trophy icon) -->
     <button id="btn-leaderboard" class="hud-btn" title="Global Urban Noise Pollution Leaderboard (UNEP / WHO)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
@@ -97,7 +99,23 @@
         <path d="M18 14.66V17c0 .55-.45 1-1 1h-2c-.55 0-1-.45-1-1v-2.34"></path>
         <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
       </svg>
-      <span>🏆 Noise Rank</span>
+      <span>Noise Rank</span>
+    </button>
+
+    <!-- Mobile Mixer Drawer Toggle Button -->
+    <button id="btn-mobile-mixer" class="hud-btn mobile-only" title="Audio Mixer & Relief Controls" aria-label="Audio Mixer">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="4" y1="21" x2="4" y2="14"></line>
+        <line x1="4" y1="10" x2="4" y2="3"></line>
+        <line x1="12" y1="21" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12" y2="3"></line>
+        <line x1="20" y1="21" x2="20" y2="16"></line>
+        <line x1="20" y1="12" x2="20" y2="3"></line>
+        <line x1="1" y1="14" x2="7" y2="14"></line>
+        <line x1="9" y1="8" x2="15" y2="8"></line>
+        <line x1="17" y1="16" x2="23" y2="16"></line>
+      </svg>
+      <span>Mixer</span>
     </button>
 
     <!-- Fly to Heaviest Rain Button -->
@@ -149,41 +167,57 @@
        BOTTOM LEFT: LIVE RAIN & GAUGE CARD
        ========================================== -->
   <div class="hud-capsule" id="hud-bottom-left">
-    <div class="hud-card-top">
-      <span id="hud-status" class="hud-status-badge">CLICK TO LISTEN</span>
-      <span id="hud-location" class="hud-location-name">Amazon Basin</span>
+    <!-- Compact Mobile Status Pill Header (Visible on Mobile) -->
+    <div class="hud-mobile-pill-header" id="hud-mobile-pill-header">
+      <div class="mobile-pill-summary">
+        <span id="mobile-pill-icon">🌧️</span>
+        <span id="mobile-pill-rate">— mm/h</span>
+        <span class="mobile-pill-sep">·</span>
+        <span id="mobile-pill-loc">Atlantic Ocean</span>
+      </div>
+      <button class="mobile-pill-toggle" id="btn-toggle-hud" aria-label="Toggle details">
+        <svg class="chevron-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
+      </button>
     </div>
 
-    <div class="hud-rate-row">
-      <span id="hud-rate" class="hud-rate-val">—</span>
-      <span class="hud-rate-unit">mm/hr</span>
-    </div>
+    <!-- Main Card Body -->
+    <div class="hud-desktop-body" id="hud-desktop-body">
+      <div class="hud-card-top">
+        <span id="hud-status" class="hud-status-badge">CLICK TO LISTEN</span>
+        <span id="hud-location" class="hud-location-name">Atlantic Ocean</span>
+      </div>
 
-    <!-- Rain Type Indicator with Hover Infocard Trigger -->
-    <div id="hud-rain-indicator" class="hud-rain-indicator" title="Hover for deep meteorological infocard">
-      <span id="hud-rain-type">🌧️ <span>Sampling live rain...</span></span>
-    </div>
+      <div class="hud-rate-row">
+        <span id="hud-rate" class="hud-rate-val">—</span>
+        <span class="hud-rate-unit">mm/hr</span>
+      </div>
 
-    <!-- Acoustic Habitat Ambience Badge -->
-    <div id="hud-env-tag" class="hud-env-tag" title="Local habitat ambience: Urban traffic, rural insects, jungle wildlife, or ocean surf">
-      <span id="hud-env-icon">🏙️</span>
-      <span id="hud-env-label">Urban Ambience</span>
-    </div>
+      <!-- Rain Type Indicator with Hover Infocard Trigger -->
+      <div id="hud-rain-indicator" class="hud-rain-indicator" title="Hover for deep meteorological infocard">
+        <span id="hud-rain-type">🌧️ <span>Sampling live rain...</span></span>
+      </div>
 
-    <!-- Urban Noise Pollution Index Badge (Interactive Flashcard Trigger) -->
-    <div id="hud-noise-badge" class="hud-noise-badge" style="display:none;" title="Click for Urban Noise Ecology & Nature Protection Flashcard">
-      <span class="noise-icon">🔊</span>
-      <span id="hud-noise-text">Noise Index: #1 Dhaka (119 dB)</span>
-      <span class="noise-arrow">→</span>
-    </div>
+      <!-- Acoustic Habitat Ambience Badge -->
+      <div id="hud-env-tag" class="hud-env-tag" title="Local habitat ambience: Urban traffic, rural insects, jungle wildlife, or ocean surf">
+        <span id="hud-env-icon">🏙️</span>
+        <span id="hud-env-label">Urban Ambience</span>
+      </div>
 
-    <!-- Animated Logarithmic Rain Intensity Gauge -->
-    <div class="rain-gauge">
-      <div id="rain-gauge-fill" class="rain-gauge-fill"></div>
-    </div>
+      <!-- Urban Noise Pollution Index Badge (Interactive Flashcard Trigger) -->
+      <div id="hud-noise-badge" class="hud-noise-badge" style="display:none;" title="Click for Urban Noise Ecology & Nature Protection Flashcard">
+        <span class="noise-icon">🔊</span>
+        <span id="hud-noise-text">Noise Index: #1 Dhaka (119 dB)</span>
+        <span class="noise-arrow">→</span>
+      </div>
 
-    <!-- Floating Scientific Infocard (Revealed on Hover) -->
-    <div id="rain-infocard" class="rain-infocard"></div>
+      <!-- Animated Logarithmic Rain Intensity Gauge -->
+      <div class="rain-gauge">
+        <div id="rain-gauge-fill" class="rain-gauge-fill"></div>
+      </div>
+
+      <!-- Floating Scientific Infocard (Revealed on Hover) -->
+      <div id="rain-infocard" class="rain-infocard"></div>
+    </div>
   </div>
 
 
@@ -191,6 +225,14 @@
        BOTTOM RIGHT: AUDIO MIXER & BUMPY GLOBE
        ========================================== -->
   <div class="hud-capsule" id="hud-bottom-right">
+    <!-- Mobile Drawer Header -->
+    <div class="mixer-mobile-header" id="mixer-mobile-header">
+      <div class="mixer-drawer-handle"></div>
+      <div class="mixer-drawer-title-row">
+        <span class="mixer-drawer-title">🎛️ Soundscape & Relief</span>
+        <button id="btn-close-mixer" class="mixer-close-btn" aria-label="Close mixer">✕</button>
+      </div>
+    </div>
     <!-- Rain Volume -->
     <div class="mixer-group">
       <span class="mixer-label">

@@ -294,19 +294,19 @@ export class SoundEngine {
 
     if (!cityKey || !isListening || this.isMuted) return;
 
-    // Trigger initial acoustic signature after short delay
+    // Trigger initial acoustic signature promptly after 600ms
     setTimeout(() => {
       if (this.currentCityKey === cityKey && this.isPlaying && !this.isMuted) {
         this.triggerCitySignature(cityKey);
       }
-    }, 1200);
+    }, 600);
 
-    // Schedule periodic authentic soundscapes (every 9 to 16 seconds)
+    // Schedule periodic authentic cultural soundscapes every 5.5 seconds
     this.citySoundTimer = setInterval(() => {
       if (this.currentCityKey === cityKey && this.isPlaying && !this.isMuted) {
         this.triggerCitySignature(cityKey);
       }
-    }, 11000);
+    }, 5500);
   }
 
   triggerCitySignature(cityKey) {
@@ -324,66 +324,205 @@ export class SoundEngine {
     };
 
     switch (cityKey) {
-      // 1. Dhaka & Delhi: Relentless high-frequency dual-tone horn chirps & rickshaw buzz
-      case 'dhaka':
-      case 'delhi': {
-        const { osc: o1, gain: g1 } = createOsc(520, 'sawtooth');
-        const { osc: o2, gain: g2 } = createOsc(580, 'sawtooth');
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(1400, now);
-        filter.Q.setValueAtTime(2.0, now);
+      // 1. London: Big Ben Westminster Quarters Chime & Double-Decker Air Brake Hiss
+      case 'london': {
+        const chime = (tOffset, freq) => {
+          const t = now + tOffset;
+          const { osc: o, gain: g } = createOsc(freq, 'sine');
+          const { osc: o2 } = createOsc(freq * 2.0, 'sine');
+          o2.disconnect();
+          o2.connect(g);
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+          o.start(t);
+          o2.start(t);
+          o.stop(t + 1.3);
+          o2.stop(t + 1.3);
+        };
+        // 4 notes of Westminster Quarters: E4, G#4, F#4, B3
+        chime(0.0, 329.63);
+        chime(0.35, 415.30);
+        chime(0.70, 369.99);
+        chime(1.05, 246.94);
 
-        o1.disconnect();
-        o2.disconnect();
-        o1.connect(filter);
-        o2.connect(filter);
-        filter.connect(g1);
-        g1.connect(this.ambienceMaster);
-
-        g1.gain.setValueAtTime(0, now);
-        g1.gain.linearRampToValueAtTime(0.18, now + 0.04);
-        g1.gain.setValueAtTime(0.18, now + 0.16);
-        g1.gain.linearRampToValueAtTime(0, now + 0.22);
-        // Second quick honk
-        g1.gain.setValueAtTime(0, now + 0.28);
-        g1.gain.linearRampToValueAtTime(0.20, now + 0.32);
-        g1.gain.linearRampToValueAtTime(0, now + 0.48);
-
-        o1.start(now);
-        o2.start(now);
-        o1.stop(now + 0.55);
-        o2.stop(now + 0.55);
+        // Pneumatic air brake release hiss at +1.5s
+        setTimeout(() => {
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const bufferSize = this.ctx.sampleRate * 0.4;
+          const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.15;
+          const noise = this.ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'highpass';
+          filter.frequency.setValueAtTime(2400, t);
+          const gain = this.ctx.createGain();
+          gain.gain.setValueAtTime(0.14, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ambienceMaster);
+          noise.start(t);
+          noise.stop(t + 0.4);
+        }, 1500);
         break;
       }
 
-      // 2. Cairo: Classic reverberant automotive horn
-      case 'cairo': {
-        const { osc: o1, gain: g1 } = createOsc(415, 'sawtooth');
-        const { osc: o2 } = createOsc(495, 'sawtooth');
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(1600, now);
-
-        o1.disconnect();
+      // 2. Madrid: Historic Puerta del Sol clock chime, Tapas Plaza Chatter & Flamenco Guitar Flourish
+      case 'madrid': {
+        // Bell chime D5 (587.33Hz)
+        const { osc: o1, gain: g1 } = createOsc(587.33, 'sine');
+        const { osc: o2 } = createOsc(1174.66, 'sine');
         o2.disconnect();
-        o1.connect(filter);
-        o2.connect(filter);
-        filter.connect(g1);
-
+        o2.connect(g1);
         g1.gain.setValueAtTime(0, now);
-        g1.gain.linearRampToValueAtTime(0.18, now + 0.05);
-        g1.gain.setValueAtTime(0.18, now + 0.32);
-        g1.gain.exponentialRampToValueAtTime(0.001, now + 0.52);
-
+        g1.gain.linearRampToValueAtTime(0.20, now + 0.02);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
         o1.start(now);
         o2.start(now);
-        o1.stop(now + 0.55);
-        o2.stop(now + 0.55);
+        o1.stop(now + 1.5);
+        o2.stop(now + 1.5);
+
+        // Classical Spanish Flamenco Guitar Arpeggio Flourish (A3, D4, F4, A4, D5)
+        const notes = [220.0, 293.66, 349.23, 440.0, 587.33];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => {
+            if (!this.ctx) return;
+            const t = this.ctx.currentTime;
+            const { osc: og, gain: gg } = createOsc(freq, 'triangle');
+            const { osc: og2 } = createOsc(freq * 2, 'sine');
+            og2.disconnect();
+            og2.connect(gg);
+            gg.gain.setValueAtTime(0, t);
+            gg.gain.linearRampToValueAtTime(0.12, t + 0.015);
+            gg.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+            og.start(t);
+            og2.start(t);
+            og.stop(t + 0.48);
+            og2.stop(t + 0.48);
+          }, 320 + idx * 75);
+        });
+
+        // Lively moped beep at +0.85s
+        setTimeout(() => {
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const { osc: o3, gain: g3 } = createOsc(740, 'triangle');
+          g3.gain.setValueAtTime(0, t);
+          g3.gain.linearRampToValueAtTime(0.14, t + 0.02);
+          g3.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          o3.start(t);
+          o3.stop(t + 0.20);
+        }, 850);
         break;
       }
 
-      // 3. New York City: Iconic Yellow Cab dual-tone horn & distant siren swell
+      // 3. Tokyo: Yamanote Line Departure Chime, Shinkansen Traction Whirr & Shibuya Pedestrian Crossing
+      case 'tokyo': {
+        // Authentic 5-note JR East Yamanote Line station departure jingle: G4, C5, D5, G5, E5
+        const jingle = [
+          { f: 392.00, dur: 0.18 }, // G4
+          { f: 523.25, dur: 0.18 }, // C5
+          { f: 587.33, dur: 0.18 }, // D5
+          { f: 783.99, dur: 0.28 }, // G5
+          { f: 659.25, dur: 0.45 }, // E5
+        ];
+        let offset = 0;
+        jingle.forEach((note) => {
+          const t = now + offset;
+          const { osc: o, gain: g } = createOsc(note.f, 'sine');
+          const { osc: o2 } = createOsc(note.f * 2, 'sine');
+          o2.disconnect();
+          o2.connect(g);
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.14, t + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.001, t + note.dur);
+          o.start(t);
+          o2.start(t);
+          o.stop(t + note.dur + 0.05);
+          o2.stop(t + note.dur + 0.05);
+          offset += note.dur * 0.85;
+        });
+
+        // Shibuya "Piyo-Piyo" pedestrian crossing signal at +1.3s
+        setTimeout(() => {
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const { osc: o1, gain: g1 } = createOsc(2093, 'sine'); // C7
+          g1.gain.setValueAtTime(0, t);
+          g1.gain.linearRampToValueAtTime(0.08, t + 0.02);
+          g1.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+          o1.start(t);
+          o1.stop(t + 0.20);
+          setTimeout(() => {
+            if (!this.ctx) return;
+            const t2 = this.ctx.currentTime;
+            const { osc: o2, gain: g2 } = createOsc(1046, 'sine'); // C6
+            g2.gain.setValueAtTime(0, t2);
+            g2.gain.linearRampToValueAtTime(0.06, t2 + 0.02);
+            g2.gain.exponentialRampToValueAtTime(0.001, t2 + 0.20);
+            o2.start(t2);
+            o2.stop(t2 + 0.22);
+          }, 110);
+        }, 1300);
+        break;
+      }
+
+      // 4. Paris: Musette Accordion Motif, Bistro Terrace Murmur & Two-Stroke Moped
+      case 'paris': {
+        // French musette accordion motif (A minor chord waltz: A4, C5, E5 with accordion detuning tremolo)
+        const accordion = (freq, tOffset) => {
+          const t = now + tOffset;
+          const { osc: o1, gain: g } = createOsc(freq, 'sawtooth');
+          const { osc: o2 } = createOsc(freq * 1.008, 'sawtooth'); // Musette detune chorus
+          o2.disconnect();
+          o2.connect(g);
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(1400, t);
+          o1.disconnect();
+          o2.disconnect();
+          o1.connect(filter);
+          o2.connect(filter);
+          filter.connect(g);
+
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.12, t + 0.03);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+          o1.start(t);
+          o2.start(t);
+          o1.stop(t + 0.58);
+          o2.stop(t + 0.58);
+        };
+        accordion(440.0, 0.0);  // A4
+        accordion(523.25, 0.18); // C5
+        accordion(659.25, 0.36); // E5
+
+        // Two-stroke delivery moped pass
+        setTimeout(() => {
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const { osc: o1, gain: g1 } = createOsc(145, 'sawtooth');
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(420, t);
+          filter.Q.setValueAtTime(3.0, t);
+          o1.disconnect();
+          o1.connect(filter);
+          filter.connect(g1);
+          g1.gain.setValueAtTime(0, t);
+          g1.gain.linearRampToValueAtTime(0.14, t + 0.35);
+          g1.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+          o1.start(t);
+          o1.stop(t + 1.2);
+        }, 550);
+        break;
+      }
+
+      // 5. New York City: Iconic Yellow Cab Dual-Tone Horn, FDNY Siren & Subway Rail Screech
       case 'new_york': {
         const { osc: o1, gain: g1 } = createOsc(370, 'sawtooth');
         const { osc: o2 } = createOsc(440, 'sawtooth');
@@ -399,173 +538,37 @@ export class SoundEngine {
         filter.connect(g1);
 
         g1.gain.setValueAtTime(0, now);
-        g1.gain.linearRampToValueAtTime(0.22, now + 0.03);
-        g1.gain.setValueAtTime(0.22, now + 0.18);
+        g1.gain.linearRampToValueAtTime(0.24, now + 0.03);
+        g1.gain.setValueAtTime(0.24, now + 0.18);
         g1.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
 
         o1.start(now);
         o2.start(now);
         o1.stop(now + 0.30);
         o2.stop(now + 0.30);
-        break;
-      }
 
-      // 4. Tokyo: Gentle Shibuya pedestrian crossing acoustic signal ("Piyo-Piyo")
-      case 'tokyo': {
-        const { osc: o1, gain: g1 } = createOsc(2093, 'sine'); // C7
-        g1.gain.setValueAtTime(0, now);
-        g1.gain.linearRampToValueAtTime(0.08, now + 0.02);
-        g1.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-        o1.start(now);
-        o1.stop(now + 0.20);
-
-        setTimeout(() => {
-          if (!this.ctx) return;
-          const now2 = this.ctx.currentTime;
-          const { osc: o2, gain: g2 } = createOsc(1046, 'sine'); // C6
-          g2.gain.setValueAtTime(0, now2);
-          g2.gain.linearRampToValueAtTime(0.06, now2 + 0.02);
-          g2.gain.exponentialRampToValueAtTime(0.001, now2 + 0.22);
-          o2.start(now2);
-          o2.stop(now2 + 0.25);
-        }, 120);
-        break;
-      }
-
-      // 5. Amsterdam: Resonant classic bicycle bell double-ring
-      case 'amsterdam': {
-        const ringBell = (timeOffset) => {
-          const t = now + timeOffset;
-          const { osc: o1, gain: g1 } = createOsc(2480, 'sine');
-          const { osc: o2 } = createOsc(4960, 'sine');
-          o2.disconnect();
-          o2.connect(g1);
-
-          g1.gain.setValueAtTime(0, t);
-          g1.gain.linearRampToValueAtTime(0.12, t + 0.01);
-          g1.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
-
-          o1.start(t);
-          o2.start(t);
-          o1.stop(t + 0.16);
-          o2.stop(t + 0.16);
-        };
-        ringBell(0);
-        ringBell(0.12);
-        break;
-      }
-
-      // 6. Istanbul: Bosphorus maritime passenger steamer horn
-      case 'istanbul': {
-        const { osc: o1, gain: g1 } = createOsc(165, 'triangle');
-        const { osc: o2 } = createOsc(168, 'sine'); // subtle chorus beat
-        o2.disconnect();
-        o2.connect(g1);
-
-        g1.gain.setValueAtTime(0, now);
-        g1.gain.linearRampToValueAtTime(0.25, now + 0.35);
-        g1.gain.setValueAtTime(0.25, now + 1.2);
-        g1.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
-
-        o1.start(now);
-        o2.start(now);
-        o1.stop(now + 2.3);
-        o2.stop(now + 2.3);
-        break;
-      }
-
-      // 7. Paris: Light two-stroke delivery moped passing
-      case 'paris': {
-        const { osc: o1, gain: g1 } = createOsc(145, 'sawtooth');
-        const filter = this.ctx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(420, now);
-        filter.Q.setValueAtTime(3.0, now);
-
-        o1.disconnect();
-        o1.connect(filter);
-        filter.connect(g1);
-
-        g1.gain.setValueAtTime(0, now);
-        g1.gain.linearRampToValueAtTime(0.12, now + 0.4);
-        g1.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-
-        o1.start(now);
-        o1.stop(now + 1.3);
-        break;
-      }
-
-      // 8. Berlin: Electric street tram warning chime
-      case 'berlin': {
-        const ring = (offset, freq) => {
-          const t = now + offset;
-          const { osc: o, gain: g } = createOsc(freq, 'sine');
-          g.gain.setValueAtTime(0, t);
-          g.gain.linearRampToValueAtTime(0.14, t + 0.01);
-          g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-          o.start(t);
-          o.stop(t + 0.18);
-        };
-        ring(0, 1760);
-        ring(0.10, 2200);
-        break;
-      }
-
-      // 9. Madrid: Historic Puerta del Sol clock bell chime & scooter chirp
-      case 'madrid': {
-        // Bell chime D5 (587Hz) with gentle overtone
-        const { osc: o1, gain: g1 } = createOsc(587.33, 'sine');
-        const { osc: o2 } = createOsc(1174.66, 'sine');
-        o2.disconnect();
-        o2.connect(g1);
-        g1.gain.setValueAtTime(0, now);
-        g1.gain.linearRampToValueAtTime(0.16, now + 0.02);
-        g1.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
-        o1.start(now);
-        o2.start(now);
-        o1.stop(now + 1.5);
-        o2.stop(now + 1.5);
-
-        // Light moped/scooter beep at +0.35s
+        // Subway rail screech (resonant high metallic squeal 2.6 kHz) at +0.35s
         setTimeout(() => {
           if (!this.ctx) return;
           const t = this.ctx.currentTime;
-          const { osc: o3, gain: g3 } = createOsc(740, 'triangle');
-          g3.gain.setValueAtTime(0, t);
-          g3.gain.linearRampToValueAtTime(0.12, t + 0.02);
-          g3.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-          o3.start(t);
-          o3.stop(t + 0.20);
+          const { osc: os, gain: gs } = createOsc(2640, 'sawtooth');
+          const sf = this.ctx.createBiquadFilter();
+          sf.type = 'bandpass';
+          sf.frequency.setValueAtTime(2600, t);
+          sf.Q.setValueAtTime(6.0, t);
+          os.disconnect();
+          os.connect(sf);
+          sf.connect(gs);
+          gs.gain.setValueAtTime(0, t);
+          gs.gain.linearRampToValueAtTime(0.09, t + 0.08);
+          gs.gain.exponentialRampToValueAtTime(0.001, t + 0.65);
+          os.start(t);
+          os.stop(t + 0.70);
         }, 350);
         break;
       }
 
-      // 10. Mumbai: Auto-rickshaw rhythmic dual-tone warning
-      case 'mumbai': {
-        const honk = (tOffset, pitch) => {
-          const t = now + tOffset;
-          const { osc: o, gain: g } = createOsc(pitch, 'sawtooth');
-          const filter = this.ctx.createBiquadFilter();
-          filter.type = 'bandpass';
-          filter.frequency.setValueAtTime(950, t);
-          filter.Q.setValueAtTime(2.2, t);
-          o.disconnect();
-          o.connect(filter);
-          filter.connect(g);
-
-          g.gain.setValueAtTime(0, t);
-          g.gain.linearRampToValueAtTime(0.19, t + 0.03);
-          g.gain.linearRampToValueAtTime(0.19, t + 0.14);
-          g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-          o.start(t);
-          o.stop(t + 0.24);
-        };
-        honk(0, 480);
-        honk(0.16, 520);
-        break;
-      }
-
-      // 11. Rome: Classic Vespa high-pitch horn double-toot
+      // 6. Rome: Vespa High-Pitch Double-Toot & Cobblestone Tire Vibration
       case 'rome': {
         const toot = (tOffset) => {
           const t = now + tOffset;
@@ -578,8 +581,8 @@ export class SoundEngine {
           filter.connect(g);
 
           g.gain.setValueAtTime(0, t);
-          g.gain.linearRampToValueAtTime(0.15, t + 0.02);
-          g.gain.linearRampToValueAtTime(0.15, t + 0.10);
+          g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+          g.gain.linearRampToValueAtTime(0.18, t + 0.10);
           g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
           o.start(t);
           o.stop(t + 0.20);
@@ -589,20 +592,155 @@ export class SoundEngine {
         break;
       }
 
-      // 12. Barcelona: Metro / modern tram chime
-      case 'barcelona': {
-        const chime = (tOffset, freq) => {
-          const t = now + tOffset;
+      // 7. Istanbul: Bosphorus Maritime Steamer Horn, Harbor Gulls & Tulip Tea Glass Clink
+      case 'istanbul': {
+        const { osc: o1, gain: g1 } = createOsc(165, 'triangle');
+        const { osc: o2 } = createOsc(168, 'sine');
+        o2.disconnect();
+        o2.connect(g1);
+
+        g1.gain.setValueAtTime(0, now);
+        g1.gain.linearRampToValueAtTime(0.26, now + 0.35);
+        g1.gain.setValueAtTime(0.26, now + 1.2);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+
+        o1.start(now);
+        o2.start(now);
+        o1.stop(now + 2.3);
+        o2.stop(now + 2.3);
+
+        // Turkish tulip tea glass clink (İnce belli çay bardağı) at +1.4s
+        setTimeout(() => {
+          if (!this.ctx) return;
+          const t = this.ctx.currentTime;
+          const { osc: oc, gain: gc } = createOsc(3450, 'sine');
+          gc.gain.setValueAtTime(0, t);
+          gc.gain.linearRampToValueAtTime(0.12, t + 0.01);
+          gc.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+          oc.start(t);
+          oc.stop(t + 0.24);
+        }, 1400);
+        break;
+      }
+
+      // 8. Amsterdam: Dutch Bicycle Double-Bell & Electric Tram Bell
+      case 'amsterdam': {
+        const ringBell = (timeOffset) => {
+          const t = now + timeOffset;
+          const { osc: o1, gain: g1 } = createOsc(2480, 'sine');
+          const { osc: o2 } = createOsc(4960, 'sine');
+          o2.disconnect();
+          o2.connect(g1);
+
+          g1.gain.setValueAtTime(0, t);
+          g1.gain.linearRampToValueAtTime(0.14, t + 0.01);
+          g1.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+
+          o1.start(t);
+          o2.start(t);
+          o1.stop(t + 0.18);
+          o2.stop(t + 0.18);
+        };
+        ringBell(0);
+        ringBell(0.12);
+        break;
+      }
+
+      // 9. Berlin: U-Bahn / S-Bahn Door Warning Chime & Street Tram Gong
+      case 'berlin': {
+        const ring = (offset, freq) => {
+          const t = now + offset;
           const { osc: o, gain: g } = createOsc(freq, 'sine');
           g.gain.setValueAtTime(0, t);
-          g.gain.linearRampToValueAtTime(0.12, t + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.001, t + 0.40);
+          g.gain.linearRampToValueAtTime(0.15, t + 0.01);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
           o.start(t);
-          o.stop(t + 0.42);
+          o.stop(t + 0.20);
         };
-        chime(0, 1046.5); // C6
-        chime(0.15, 1318.5); // E6
-        chime(0.30, 1567.98); // G6
+        ring(0, 1760);
+        ring(0.12, 2200);
+        break;
+      }
+
+      // 10. Mumbai & Delhi: Auto-Rickshaw Rhythmic Brass Horns & Bazaar Hubbub
+      case 'mumbai':
+      case 'delhi': {
+        const honk = (tOffset, pitch) => {
+          const t = now + tOffset;
+          const { osc: o, gain: g } = createOsc(pitch, 'sawtooth');
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(980, t);
+          filter.Q.setValueAtTime(2.2, t);
+          o.disconnect();
+          o.connect(filter);
+          filter.connect(g);
+
+          g.gain.setValueAtTime(0, t);
+          g.gain.linearRampToValueAtTime(0.20, t + 0.03);
+          g.gain.linearRampToValueAtTime(0.20, t + 0.14);
+          g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+          o.start(t);
+          o.stop(t + 0.24);
+        };
+        honk(0, 480);
+        honk(0.16, 520);
+        break;
+      }
+
+      // 11. Cairo: Reverberant Street Automotive Horn Chorus
+      case 'cairo': {
+        const { osc: o1, gain: g1 } = createOsc(415, 'sawtooth');
+        const { osc: o2 } = createOsc(495, 'sawtooth');
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1600, now);
+
+        o1.disconnect();
+        o2.disconnect();
+        o1.connect(filter);
+        o2.connect(filter);
+        filter.connect(g1);
+
+        g1.gain.setValueAtTime(0, now);
+        g1.gain.linearRampToValueAtTime(0.20, now + 0.05);
+        g1.gain.setValueAtTime(0.20, now + 0.32);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + 0.52);
+
+        o1.start(now);
+        o2.start(now);
+        o1.stop(now + 0.55);
+        o2.stop(now + 0.55);
+        break;
+      }
+
+      // 12. Dhaka: High-Frequency Dual-Tone Rickshaw Horns
+      case 'dhaka': {
+        const { osc: o1, gain: g1 } = createOsc(520, 'sawtooth');
+        const { osc: o2 } = createOsc(580, 'sawtooth');
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1400, now);
+        filter.Q.setValueAtTime(2.0, now);
+
+        o1.disconnect();
+        o2.disconnect();
+        o1.connect(filter);
+        o2.connect(filter);
+        filter.connect(g1);
+
+        g1.gain.setValueAtTime(0, now);
+        g1.gain.linearRampToValueAtTime(0.20, now + 0.04);
+        g1.gain.setValueAtTime(0.20, now + 0.16);
+        g1.gain.linearRampToValueAtTime(0, now + 0.22);
+        g1.gain.setValueAtTime(0, now + 0.28);
+        g1.gain.linearRampToValueAtTime(0.22, now + 0.32);
+        g1.gain.linearRampToValueAtTime(0, now + 0.48);
+
+        o1.start(now);
+        o2.start(now);
+        o1.stop(now + 0.55);
+        o2.stop(now + 0.55);
         break;
       }
 

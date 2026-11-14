@@ -93,6 +93,8 @@ class App {
     this.initSearch();
     this.initLeaderboard();
     this.initInfocardHover();
+    this.initStarsBackground();
+    this.initMobileUI();
     this.loadGlobalPrecipitationBuffer();
   }
 
@@ -202,7 +204,7 @@ class App {
           {
             id: 'background',
             type: 'background',
-            paint: { 'background-color': isDark ? '#05070d' : '#dbeafe' }
+            paint: { 'background-color': 'rgba(0, 0, 0, 0)' }
           },
           // Base Physical Topographic Layer
           {
@@ -264,8 +266,8 @@ class App {
           exaggeration: this.bumpLevel
         },
         sky: {
-          'sky-color': isDark ? '#05070d' : '#cfe2fe',
-          'horizon-color': isDark ? '#0a1628' : '#e0f2fe',
+          'sky-color': isDark ? 'rgba(5, 7, 13, 0.2)' : 'rgba(207, 226, 254, 0.4)',
+          'horizon-color': isDark ? 'rgba(10, 22, 40, 0.5)' : 'rgba(224, 242, 254, 0.6)',
           'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.90, 4, 0.65, 7, 0.15]
         }
       },
@@ -360,7 +362,7 @@ class App {
     const isDark = theme === 'dark';
     try {
       if (this.map.getLayer('background')) {
-        this.map.setPaintProperty('background', 'background-color', isDark ? '#05070d' : '#dbeafe');
+        this.map.setPaintProperty('background', 'background-color', 'rgba(0, 0, 0, 0)');
       }
       if (this.map.getLayer('base-layer')) {
         this.map.setPaintProperty('base-layer', 'raster-brightness-max', isDark ? 0.88 : 1.0);
@@ -414,21 +416,36 @@ class App {
   // ==========================================
 
   async loadGlobalPrecipitationBuffer() {
-    const url = `https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${encodeURIComponent(
+    // Stitch exact 4 WMTS tiles at TILEMATRIX=1 (GoogleMapsCompatible_Level6)
+    // Row 0-1, Col 0-1 forms the complete 512x512 global projection
+    // 100% mathematically and visually identical to MapLibre's live rain tiles!
+    const baseUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/wmts.cgi?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=${encodeURIComponent(
       this.activeRainLayerId
-    )}&CRS=EPSG:3857&BBOX=-20037508,-20037508,20037508,20037508&WIDTH=512&HEIGHT=512&FORMAT=image/png&TRANSPARENT=TRUE`;
+    )}&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible_Level6&TILEMATRIX=1&FORMAT=image/png`;
+
+    const tiles = [
+      { col: 0, row: 0, dx: 0, dy: 0 },
+      { col: 1, row: 0, dx: 256, dy: 0 },
+      { col: 0, row: 1, dx: 0, dy: 256 },
+      { col: 1, row: 1, dx: 256, dy: 256 }
+    ];
 
     try {
-      const resp = await fetch(url, { cache: 'no-store' });
-      if (!resp.ok) throw new Error('WMS status ' + resp.status);
-      const blob = await resp.blob();
-
-      const img = new Image();
-      img.src = URL.createObjectURL(blob);
-      await img.decode();
-
       this.samplingCtx.clearRect(0, 0, 512, 512);
-      this.samplingCtx.drawImage(img, 0, 0, 512, 512);
+
+      await Promise.all(
+        tiles.map(async (t) => {
+          const url = `${baseUrl}&TILEROW=${t.row}&TILECOL=${t.col}`;
+          const resp = await fetch(url, { cache: 'no-store' });
+          if (!resp.ok) throw new Error(`WMTS tile ${t.col},${t.row} status ${resp.status}`);
+          const blob = await resp.blob();
+          const img = new Image();
+          img.src = URL.createObjectURL(blob);
+          await img.decode();
+          this.samplingCtx.drawImage(img, t.dx, t.dy, 256, 256);
+          URL.revokeObjectURL(img.src);
+        })
+      );
 
       this.pixelData = this.samplingCtx.getImageData(0, 0, 512, 512).data;
       this.isRasterReady = true;
@@ -440,17 +457,34 @@ class App {
         this.setListeningPoint(this.listeningTarget.lng, this.listeningTarget.lat, this.listeningTarget.label, false);
       }
     } catch (err) {
-      console.warn('Global precipitation buffer fetch failed:', err);
-      if (this.activeRainLayerId === 'IMERG_Precipitation_Rate_30min') {
-        this.activeRainLayerId = 'IMERG_Precipitation_Rate';
-        this.loadGlobalPrecipitationBuffer();
+      console.warn('WMTS 4-tile buffer fetch fallback to WMS:', err);
+      try {
+        const wmsUrl = `https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${encodeURIComponent(
+          this.activeRainLayerId
+        )}&CRS=EPSG:3857&BBOX=-20037508,-20037508,20037508,20037508&WIDTH=512&HEIGHT=512&FORMAT=image/png&TRANSPARENT=TRUE`;
+        const resp = await fetch(wmsUrl, { cache: 'no-store' });
+        const blob = await resp.blob();
+        const img = new Image();
+        img.src = URL.createObjectURL(blob);
+        await img.decode();
+        this.samplingCtx.clearRect(0, 0, 512, 512);
+        this.samplingCtx.drawImage(img, 0, 0, 512, 512);
+        this.pixelData = this.samplingCtx.getImageData(0, 0, 512, 512).data;
+        this.isRasterReady = true;
+      } catch (e) {
+        console.warn('Raster precipitation buffer unavailable:', e);
       }
     }
   }
 
-  // True Bilinear Interpolation over floating coordinates
+  // True Bilinear Interpolation over floating coordinates with coordinate caching
   sampleRateAt(lng, lat) {
     if (!this.isRasterReady || !this.pixelData) return 0;
+
+    const cacheKey = `${lng.toFixed(3)},${lat.toFixed(3)}`;
+    if (this._sampleCache && this._sampleCache.key === cacheKey) {
+      return this._sampleCache.val;
+    }
 
     const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
     const normLng = ((lng + 180) % 360 + 360) % 360 - 180;
@@ -475,23 +509,34 @@ class App {
     const r01 = this.getPixelRainRate(x0, y1);
     const r11 = this.getPixelRainRate(x1, y1);
 
-    if (r00 === 0 && r10 === 0 && r01 === 0 && r11 === 0) return 0;
+    if (r00 === 0 && r10 === 0 && r01 === 0 && r11 === 0) {
+      this._sampleCache = { key: cacheKey, val: 0 };
+      return 0;
+    }
 
     const top = (1 - wx) * r00 + wx * r10;
     const bottom = (1 - wx) * r01 + wx * r11;
-    const interpolated = (1 - wy) * top + wy * bottom;
+    const interpolated = Math.max(0, (1 - wy) * top + wy * bottom);
 
-    return Math.max(0, interpolated);
+    this._sampleCache = { key: cacheKey, val: interpolated };
+    return interpolated;
   }
 
   getPixelRainRate(px, py) {
     const idx = (py * 512 + px) * 4;
-    if (this.pixelData[idx + 3] < 15) return 0;
-    return this.matchPixelToPalette(
-      this.pixelData[idx],
-      this.pixelData[idx + 1],
-      this.pixelData[idx + 2]
-    );
+    const a = this.pixelData[idx + 3];
+    if (a < 40) return 0; // Ignore transparent or insignificant background pixels
+
+    const r = this.pixelData[idx];
+    const g = this.pixelData[idx + 1];
+    const b = this.pixelData[idx + 2];
+
+    // Filter out grayscale land/sea base map bleed or no-data entries (e.g. 128,128,128 or 191,191,191)
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    if (maxC - minC < 16) return 0;
+
+    return this.matchPixelToPalette(r, g, b);
   }
 
   matchPixelToPalette(r, g, b) {
@@ -509,6 +554,8 @@ class App {
         if (dist === 0) break;
       }
     }
+    // Strict Euclidean distance cutoff: if pixel color is not within 45 RGB units of palette, it's NOT rain!
+    if (bestDist > 2200) return 0;
     return bestVal;
   }
 
@@ -836,13 +883,22 @@ class App {
   }
 
   updateHud(rate, rainType, locationName) {
-    this.hudRate.textContent = rate < 0.05 ? '0.0' : rate.toFixed(1);
+    const rateStr = rate < 0.05 ? '0.0' : rate.toFixed(1);
+    this.hudRate.textContent = rateStr;
     this.hudRainType.innerHTML = `${rainType.icon} <span>${rainType.tag}</span>`;
     this.hudLocation.textContent = locationName;
     this.hudStatus.textContent = this.isListening ? 'LIVE AUDIO ACTIVE' : 'CLICK TO LISTEN';
 
     const logNorm = Math.min(1.0, Math.max(0, Math.log10(Math.max(0.01, rate) + 0.1) / 2.2));
     this.rainGaugeFill.style.width = `${Math.round(logNorm * 100)}%`;
+
+    // Update compact mobile status pill
+    const pillIcon = document.getElementById('mobile-pill-icon');
+    const pillRate = document.getElementById('mobile-pill-rate');
+    const pillLoc = document.getElementById('mobile-pill-loc');
+    if (pillIcon) pillIcon.textContent = rainType ? rainType.icon : '🌧️';
+    if (pillRate) pillRate.textContent = `${rateStr} mm/h`;
+    if (pillLoc) pillLoc.textContent = locationName || 'Global Ocean';
 
     this.populateInfocard(rainType, rate);
   }
@@ -1143,6 +1199,17 @@ class App {
       }
     });
 
+    // Generous, touch-friendly hitbox layer for mobile and desktop (48px tap target)
+    this.map.addLayer({
+      id: 'cities-hitbox',
+      type: 'circle',
+      source: 'cities-source',
+      paint: {
+        'circle-radius': 24,
+        'circle-opacity': 0.0001
+      }
+    });
+
     // Floating Popup
     this.cityPopup = new maplibregl.Popup({
       closeButton: false,
@@ -1150,7 +1217,7 @@ class App {
       offset: 10
     });
 
-    this.map.on('mouseenter', 'cities-dots', (e) => {
+    this.map.on('mouseenter', 'cities-hitbox', (e) => {
       this.map.getCanvas().style.cursor = 'pointer';
       if (!e.features || !e.features.length) return;
       const f = e.features[0];
@@ -1175,12 +1242,12 @@ class App {
       this.cityPopup.setLngLat(coords).setHTML(content).addTo(this.map);
     });
 
-    this.map.on('mouseleave', 'cities-dots', () => {
+    this.map.on('mouseleave', 'cities-hitbox', () => {
       this.map.getCanvas().style.cursor = '';
       this.cityPopup.remove();
     });
 
-    this.map.on('click', 'cities-dots', (e) => {
+    this.map.on('click', 'cities-hitbox', (e) => {
       if (!e.features || !e.features.length) return;
       const f = e.features[0];
       const coords = f.geometry.coordinates;
@@ -1269,15 +1336,7 @@ class App {
     if (this.isRasterReady && this.pixelData) {
       for (let py = 12; py < 500; py += 2) {
         for (let px = 0; px < 512; px += 2) {
-          const idx = (py * 512 + px) * 4;
-          if (this.pixelData[idx + 3] < 20) continue;
-
-          const rate = this.matchPixelToPalette(
-            this.pixelData[idx],
-            this.pixelData[idx + 1],
-            this.pixelData[idx + 2]
-          );
-
+          const rate = this.getPixelRainRate(px, py);
           if (rate > maxRate) {
             maxRate = rate;
             bestPixel = { px, py };
@@ -1290,13 +1349,7 @@ class App {
           for (let dx = -2; dx <= 2; dx++) {
             const px = Math.max(0, Math.min(511, bestPixel.px + dx));
             const py = Math.max(0, Math.min(511, bestPixel.py + dy));
-            const idx = (py * 512 + px) * 4;
-            if (this.pixelData[idx + 3] < 20) continue;
-            const rate = this.matchPixelToPalette(
-              this.pixelData[idx],
-              this.pixelData[idx + 1],
-              this.pixelData[idx + 2]
-            );
+            const rate = this.getPixelRainRate(px, py);
             if (rate > maxRate) {
               maxRate = rate;
               bestPixel = { px, py };
@@ -1502,6 +1555,107 @@ class App {
     noiseModal?.addEventListener('click', (e) => {
       if (e.target === noiseModal) noiseModal.classList.remove('open');
     });
+  }
+
+  // ==========================================
+  // CELESTIAL BACKGROUND STARS (BEHIND GLOBE)
+  // ==========================================
+
+  initStarsBackground() {
+    const canvas = document.getElementById('stars-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawStars();
+    };
+
+    const drawStars = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const numStars = Math.floor((canvas.width * canvas.height) / 4800);
+      for (let i = 0; i < numStars; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const r = Math.random() * 0.9 + 0.4;
+        const alpha = Math.random() * 0.16 + 0.08;
+
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        const tint = Math.random();
+        if (tint < 0.2) {
+          ctx.fillStyle = `rgba(186, 230, 253, ${alpha})`;
+        } else if (tint < 0.35) {
+          ctx.fillStyle = `rgba(254, 240, 138, ${alpha})`;
+        } else {
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+        }
+        ctx.fill();
+      }
+    };
+
+    window.addEventListener('resize', resize, { passive: true });
+    resize();
+  }
+
+  // ==========================================
+  // MOBILE HUD & SLIDE-UP DRAWER CONTROLS
+  // ==========================================
+
+  initMobileUI() {
+    const btnMobileMixer = document.getElementById('btn-mobile-mixer');
+    const hudBottomRight = document.getElementById('hud-bottom-right');
+    const btnCloseMixer = document.getElementById('btn-close-mixer');
+
+    const syncPillVisibility = () => {
+      if (hudBottomLeft && hudBottomRight) {
+        const isMixerOpen = hudBottomRight.classList.contains('mobile-open');
+        hudBottomLeft.style.display = isMixerOpen ? 'none' : '';
+      }
+    };
+
+    if (btnMobileMixer && hudBottomRight) {
+      btnMobileMixer.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hudBottomRight.classList.toggle('mobile-open');
+        syncPillVisibility();
+      });
+    }
+
+    if (new URLSearchParams(window.location.search).has('mixer') && hudBottomRight) {
+      hudBottomRight.classList.add('mobile-open');
+      syncPillVisibility();
+    }
+
+    if (btnCloseMixer && hudBottomRight) {
+      btnCloseMixer.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hudBottomRight.classList.remove('mobile-open');
+        syncPillVisibility();
+      });
+    }
+
+    const mobilePillHeader = document.getElementById('hud-mobile-pill-header');
+    const hudBottomLeft = document.getElementById('hud-bottom-left');
+
+    if (mobilePillHeader && hudBottomLeft) {
+      mobilePillHeader.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hudBottomLeft.classList.toggle('expanded');
+      });
+    }
+
+    if (this.map) {
+      this.map.on('click', () => {
+        if (hudBottomRight) hudBottomRight.classList.remove('mobile-open');
+        if (hudBottomLeft) {
+          hudBottomLeft.classList.remove('expanded');
+          syncPillVisibility();
+        }
+      });
+    }
   }
 
   updateZoomDisplay() {
