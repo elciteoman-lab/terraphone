@@ -1,7 +1,8 @@
 # raIn.tensity 🌧️🌍
 
 > **NASA Space Apps Challenge** · Live Rain Sound Simulator on a 3D Bumpy Globe  
-> Powered by **NASA Scientific Visualization Studio (SVS) Entry 5650** & **NASA GPM IMERG**
+> Powered by **NASA Scientific Visualization Studio (SVS) Entry 5650** & **NASA GPM IMERG**  
+> 🔗 **Live Demo**: [https://vylt-gh.github.io/raIn.tensity/](https://vylt-gh.github.io/raIn.tensity/)
 
 `raIn.tensity` is an ambient global rain sound simulator designed with a sleek, minimalist, out-of-your-way UI inspired by **slowroads.io**. Explore the Earth as a tactile 3D bumpy globe, discover near-real-time global storm systems, and listen to authentic procedural rain acoustics that dynamically evolve as you zoom from orbital altitudes down to ground level.
 
