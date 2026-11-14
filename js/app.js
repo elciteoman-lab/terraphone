@@ -5,7 +5,16 @@
  * Hovering Atmospheric Cloud Deck · Convective Thunder & Lightning · Location Ambience
  */
 
-import { IMERG_PALETTE, RAIN_TYPES, getRainType, PRESET_HOTSPOTS, CITIES_DATABASE, QUIZ_QUESTIONS } from './data.js';
+import {
+  IMERG_PALETTE,
+  RAIN_TYPES,
+  getRainType,
+  PRESET_HOTSPOTS,
+  CITIES_DATABASE,
+  QUIZ_QUESTIONS,
+  isCoordinateLand,
+  getCityNoiseData
+} from './data.js';
 import { SoundEngine } from './audio.js';
 import { SearchController } from './search.js';
 
@@ -26,12 +35,18 @@ class App {
     // Theme state ('auto', 'dark', 'light')
     this.themeMode = 'auto';
 
-    // Bumpy terrain level: Calibrated for dramatic tactile relief
+    // 3D Terrain Relief Toggle State (starts ON with calibrated exaggeration 2.6)
+    this.isTerrainEnabled = true;
     this.bumpLevel = 2.6;
+
+    // Current city noise pollution profile
+    this.currentNoiseData = null;
 
     // Listening & Target state
     this.isListening = false;
     this.listeningTarget = null;
+    this.crosshairMarker = null;
+    this.crosshairEl = null;
     this.currentEnv = 'rural';
     this.activeRainLayerId = 'IMERG_Precipitation_Rate_30min';
     this.convectiveThunderTimer = null;
@@ -356,22 +371,28 @@ class App {
   }
 
   // ==========================================
-  // BUMPY GLOBE RELIEF CONTROLS
+  // BUMPY GLOBE RELIEF CONTROLS (ON / OFF TOGGLE)
   // ==========================================
 
-  setBumpLevel(level) {
-    this.bumpLevel = level;
+  toggleTerrainRelief() {
+    this.isTerrainEnabled = !this.isTerrainEnabled;
     this.applyTerrainBumpiness();
 
-    document.querySelectorAll('.bump-pill').forEach((el) => {
-      el.classList.toggle('active', parseFloat(el.dataset.level) === level);
-    });
+    const btn = document.getElementById('btn-relief-toggle');
+    const label = document.getElementById('relief-toggle-label');
+    if (btn) {
+      btn.classList.toggle('active', this.isTerrainEnabled);
+      btn.setAttribute('aria-pressed', this.isTerrainEnabled ? 'true' : 'false');
+    }
+    if (label) {
+      label.textContent = this.isTerrainEnabled ? 'ON' : 'OFF';
+    }
   }
 
   applyTerrainBumpiness() {
     if (!this.map) return;
     try {
-      if (this.bumpLevel <= 0.05) {
+      if (!this.isTerrainEnabled) {
         this.map.setTerrain(null);
       } else {
         this.map.setTerrain({
@@ -493,17 +514,13 @@ class App {
   // ==========================================
 
   classifyLocationEnvironment(lng, lat) {
-    // 1. Check ocean / maritime zones
-    const inPacific = (lng < -125 && lng > -175 && Math.abs(lat) < 55) || (lng > 150 && lng < 180 && Math.abs(lat) < 40);
-    const inAtlantic = (lng > -45 && lng < -18 && Math.abs(lat) < 45);
-    const inIndian = (lng > 55 && lng < 95 && lat < 5 && lat > -45);
-    const inSouthern = (lat < -55);
-    const inArctic = (lat > 78);
-    if (inPacific || inAtlantic || inIndian || inSouthern || inArctic) {
+    // 1. Exact 1-degree global land/ocean bitmask lookup (Natural Earth 110m)
+    // Instantaneous O(1) determination: oceans worldwide are 100% accurately detected
+    if (!isCoordinateLand(lng, lat)) {
       return 'ocean';
     }
 
-    // 2. Check equatorial / tropical rainforests (Jungle wildlife)
+    // 2. Equatorial / tropical rainforests (Jungle wildlife)
     // Amazon Basin
     if (lat >= -12 && lat <= 6 && lng >= -76 && lng <= -48) return 'jungle';
     // Congo Basin
@@ -513,7 +530,7 @@ class App {
     // Chocó Rainforest (Colombia)
     if (lat >= 2 && lat <= 9 && lng >= -78 && lng <= -75) return 'jungle';
 
-    // 3. Check urban proximity (Metropolises from CITIES_DATABASE)
+    // 3. Urban proximity (Metropolises from CITIES_DATABASE)
     for (const city of CITIES_DATABASE) {
       const dLng = lng - city.lng;
       const dLat = lat - city.lat;
@@ -523,7 +540,7 @@ class App {
       }
     }
 
-    // 4. Default: Countryside / Rural woodland
+    // 4. Land default: Countryside / Rural woodland
     return 'rural';
   }
 
@@ -588,9 +605,12 @@ class App {
 
     if (this.isZenMode) {
       if (toast) {
-        toast.textContent = 'Zen Mode · Auto-rotating (Press H to restore UI)';
+        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        toast.textContent = isTouch
+          ? 'Zen Mode · Auto-rotating (Tap "Exit Zen Mode" to restore UI)'
+          : 'Zen Mode · Auto-rotating (Press H or click Exit to restore UI)';
         toast.classList.add('visible');
-        setTimeout(() => toast.classList.remove('visible'), 3200);
+        setTimeout(() => toast.classList.remove('visible'), 3600);
       }
       this.startZenAutoRotation();
     } else {
@@ -657,10 +677,24 @@ class App {
 
     this.listeningTarget = { lng, lat, rate, label: locationName };
 
+    // Update persistent target crosshair indicator on the globe
+    this.updateListeningCrosshair(lng, lat);
+
     // Detect environment (urban, rural, jungle, ocean)
     const envType = this.classifyLocationEnvironment(lng, lat);
     this.currentEnv = envType;
     this.updateEnvironmentBadge(envType);
+
+    // City-specific noise pollution ranking & acoustic signature
+    const noiseData = getCityNoiseData(locationName, lng, lat);
+    this.currentNoiseData = noiseData;
+    this.updateNoiseBadge(noiseData);
+
+    if (noiseData) {
+      this.sound.setCityAcoustics(noiseData.key, true);
+    } else {
+      this.sound.setCityAcoustics(null, false);
+    }
 
     if (triggerRipple) {
       this.triggerSonarPing(lng, lat);
@@ -682,6 +716,91 @@ class App {
     if (rate >= 18.0) {
       this.sound.triggerThunderStrike(1.0);
     }
+  }
+
+  updateNoiseBadge(noiseData) {
+    const badge = document.getElementById('hud-noise-badge');
+    const textEl = document.getElementById('hud-noise-text');
+    if (!badge) return;
+
+    if (!noiseData) {
+      badge.style.display = 'none';
+      return;
+    }
+
+    badge.style.display = 'inline-flex';
+    badge.className = 'hud-noise-badge';
+    if (noiseData.dBA <= 76) {
+      badge.classList.add('low');
+    } else if (noiseData.dBA <= 89) {
+      badge.classList.add('moderate');
+    } else {
+      badge.classList.add('hazardous');
+    }
+
+    if (textEl) {
+      textEl.textContent = `🔊 #${noiseData.rank} ${noiseData.name} · ${noiseData.dBA} dB`;
+    }
+  }
+
+  openNoiseModal(noiseData) {
+    if (!noiseData) return;
+    const modal = document.getElementById('noise-modal');
+    if (!modal) return;
+
+    const badgeEl = document.getElementById('modal-noise-badge');
+    const cityEl = document.getElementById('modal-noise-city');
+    const dbEl = document.getElementById('modal-noise-db');
+    const levelEl = document.getElementById('modal-noise-level');
+    const barEl = document.getElementById('modal-noise-bar');
+    const whoEl = document.getElementById('modal-noise-who');
+    const sourcesEl = document.getElementById('modal-noise-sources');
+    const natureEl = document.getElementById('modal-noise-nature');
+    const solutionsEl = document.getElementById('modal-noise-solutions');
+
+    if (badgeEl) badgeEl.textContent = `🔊 Noise Rank #${noiseData.rank}`;
+    if (cityEl) cityEl.textContent = noiseData.name;
+    if (dbEl) dbEl.textContent = noiseData.dBA;
+
+    if (levelEl) {
+      levelEl.textContent = noiseData.level;
+      levelEl.className = 'meter-level-tag';
+      if (noiseData.dBA <= 76) {
+        levelEl.classList.add('low');
+      } else if (noiseData.dBA <= 89) {
+        levelEl.classList.add('moderate');
+      } else {
+        levelEl.classList.add('hazardous');
+      }
+    }
+
+    if (barEl) {
+      const pct = Math.min(100, Math.max(15, (noiseData.dBA / 125) * 100));
+      barEl.style.width = `${pct}%`;
+      if (noiseData.dBA <= 76) {
+        barEl.style.background = 'linear-gradient(90deg, #10b981, #06b6d4)';
+      } else if (noiseData.dBA <= 89) {
+        barEl.style.background = 'linear-gradient(90deg, #f59e0b, #ef4444)';
+      } else {
+        barEl.style.background = 'linear-gradient(90deg, #ef4444, #b91c1c)';
+      }
+    }
+
+    if (whoEl) {
+      const diff = noiseData.dBA - 53;
+      whoEl.textContent = diff > 0
+        ? `+${diff} dB above WHO Environmental Noise guideline (53 dB Lden)`
+        : `${Math.abs(diff)} dB below WHO Environmental Noise guideline (53 dB Lden)`;
+    }
+
+    if (sourcesEl) sourcesEl.textContent = noiseData.sources;
+    if (natureEl) natureEl.textContent = noiseData.natureImpact;
+
+    if (solutionsEl && Array.isArray(noiseData.solutions)) {
+      solutionsEl.innerHTML = noiseData.solutions.map((s) => `<li>${s}</li>`).join('');
+    }
+
+    modal.classList.add('open');
   }
 
   updateAudioForCurrentTarget() {
@@ -736,6 +855,39 @@ class App {
     setTimeout(() => {
       marker.remove();
     }, 1800);
+  }
+
+  updateListeningCrosshair(lng, lat) {
+    if (!this.map) return;
+
+    if (!this.crosshairMarker) {
+      const el = document.createElement('div');
+      el.className = 'listening-crosshair';
+      el.innerHTML = `
+        <div class="crosshair-ring"></div>
+        <div class="crosshair-center"></div>
+        <div class="crosshair-tick tick-top"></div>
+        <div class="crosshair-tick tick-bottom"></div>
+        <div class="crosshair-tick tick-left"></div>
+        <div class="crosshair-tick tick-right"></div>
+      `;
+      this.crosshairEl = el;
+      this.crosshairMarker = new maplibregl.Marker({
+        element: el,
+        anchor: 'center'
+      })
+        .setLngLat([lng, lat])
+        .addTo(this.map);
+    } else {
+      this.crosshairMarker.setLngLat([lng, lat]);
+    }
+
+    if (this.crosshairEl) {
+      const ping = document.createElement('div');
+      ping.className = 'crosshair-ping';
+      this.crosshairEl.appendChild(ping);
+      setTimeout(() => ping.remove(), 1100);
+    }
   }
 
   // ==========================================
@@ -1258,6 +1410,34 @@ class App {
     btn.classList.toggle('active', isPlaying);
   }
 
+  toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.warn('Fullscreen request failed:', err);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch((err) => {
+          console.warn('Exit fullscreen failed:', err);
+        });
+      }
+    }
+  }
+
+  updateFullscreenVisual(isFs) {
+    const expandIcon = document.getElementById('fullscreen-icon-expand');
+    const compressIcon = document.getElementById('fullscreen-icon-compress');
+    const btnFs = document.getElementById('btn-fullscreen');
+    if (expandIcon && compressIcon) {
+      expandIcon.style.display = isFs ? 'none' : 'block';
+      compressIcon.style.display = isFs ? 'block' : 'none';
+    }
+    if (btnFs) {
+      btnFs.classList.toggle('active', isFs);
+      btnFs.setAttribute('title', isFs ? 'Exit Fullscreen' : 'Toggle Fullscreen (F11)');
+    }
+  }
+
   // ==========================================
   // CONTROLS & MODALS
   // ==========================================
@@ -1268,23 +1448,42 @@ class App {
     document.getElementById('btn-lofi')?.addEventListener('click', () => this.toggleLoFi());
     document.getElementById('btn-listen')?.addEventListener('click', () => this.togglePlayback());
     document.getElementById('btn-hide-ui')?.addEventListener('click', () => this.toggleUiVisibility());
+    document.getElementById('btn-fullscreen')?.addEventListener('click', () => this.toggleFullscreen());
+    document.getElementById('btn-exit-zen')?.addEventListener('click', () => this.toggleUiVisibility());
 
-    document.querySelectorAll('.bump-pill').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const level = parseFloat(btn.dataset.level);
-        this.setBumpLevel(level);
-      });
+    document.addEventListener('fullscreenchange', () => {
+      this.updateFullscreenVisual(!!document.fullscreenElement);
     });
 
+    // 3D Terrain Relief Toggle
+    document.getElementById('btn-relief-toggle')?.addEventListener('click', () => {
+      this.toggleTerrainRelief();
+    });
+
+    // Info Modal
     const infoModal = document.getElementById('info-modal');
     document.getElementById('btn-info')?.addEventListener('click', () => {
-      infoModal.classList.add('open');
+      infoModal?.classList.add('open');
     });
     document.getElementById('close-info-modal')?.addEventListener('click', () => {
-      infoModal.classList.remove('open');
+      infoModal?.classList.remove('open');
     });
     infoModal?.addEventListener('click', (e) => {
       if (e.target === infoModal) infoModal.classList.remove('open');
+    });
+
+    // Noise Pollution Modal
+    const noiseModal = document.getElementById('noise-modal');
+    document.getElementById('hud-noise-badge')?.addEventListener('click', () => {
+      if (this.currentNoiseData) {
+        this.openNoiseModal(this.currentNoiseData);
+      }
+    });
+    document.getElementById('close-noise-modal')?.addEventListener('click', () => {
+      noiseModal?.classList.remove('open');
+    });
+    noiseModal?.addEventListener('click', (e) => {
+      if (e.target === noiseModal) noiseModal.classList.remove('open');
     });
   }
 

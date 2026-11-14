@@ -361,3 +361,404 @@ export const QUIZ_QUESTIONS = [
     funFact: 'Some weather stations in the Yungay sector of the Atacama have never recorded a single drop of rain in their entire operational history.'
   }
 ];
+
+// ==========================================
+// URBAN ACOUSTIC ECOLOGY & NOISE POLLUTION
+// UNEP Frontiers Report & WHO Environmental Guidelines
+// ==========================================
+export const CITY_NOISE_PROFILES = {
+  dhaka: {
+    key: 'dhaka',
+    name: 'Dhaka',
+    country: 'Bangladesh',
+    lat: 23.81,
+    lng: 90.41,
+    rank: 1,
+    dBA: 119,
+    level: 'Hazardous Deluge',
+    color: '#ef4444',
+    soundType: 'horns_dense',
+    audioSignature: 'Dense cacophony of relentless vehicle horns, un-muffled auto-rickshaws, and bazaar roar.',
+    whoComparison: '+66 dB over WHO 53 dB safe threshold (4x human auditory pain threshold)',
+    primarySources: 'Continuous pneumatic horn blasts, 2-stroke motorized rickshaws, unregulated traffic density, and construction compressors.',
+    natureImpact: 'Completely masks avian communication and mating calls across the Buriganga basin. Migratory delta waterbirds abandon traditional stopovers.',
+    humanImpact: 'Over 30% of permanent urban residents suffer irreversible hearing loss, severe hypertension, and persistent sleep fragmentation.',
+    solutions: [
+      'Strict ban on high-decibel multi-tone electric horns with automated acoustic camera enforcement.',
+      'Transition of 100,000+ auto-rickshaws to silent electric battery powertrains.',
+      'Creation of linear urban tree barriers (bamboo and banyan belts) along arterial roads to attenuate sound by 8–12 dB.',
+      'Decentralization of inter-district bus and truck terminals away from residential educational zones.'
+    ]
+  },
+  moradabad: {
+    key: 'moradabad',
+    name: 'Moradabad',
+    country: 'India',
+    lat: 28.84,
+    lng: 78.78,
+    rank: 2,
+    dBA: 114,
+    level: 'Hazardous',
+    color: '#ef4444',
+    soundType: 'industrial_traffic',
+    audioSignature: 'Heavy metallic brass beating, industrial forging, and highway freight corridors.',
+    whoComparison: '+61 dB above WHO guideline',
+    primarySources: 'Cottage brassware manufacturing, metal hammering, highway truck freight, and lack of zoning.',
+    natureImpact: 'Drives nocturnal birds and pollinators away from urban riverine corridors along the Ramganga.',
+    humanImpact: 'Widespread acoustic trauma among artisanal craftworkers and chronic cardiovascular stress.',
+    solutions: [
+      'Relocating metal forging and brass beating to acoustic-insulated industrial eco-parks outside residential sectors.',
+      'Mandatory sound-dampening acoustic curtains and shock-absorption rubber mats for brass workshops.',
+      'Vegetative noise buffer strips with neem and peepal trees along Ramganga road corridors.'
+    ]
+  },
+  islamabad: {
+    key: 'islamabad',
+    name: 'Islamabad',
+    country: 'Pakistan',
+    lat: 33.68,
+    lng: 73.04,
+    rank: 3,
+    dBA: 105,
+    level: 'Hazardous',
+    color: '#ef4444',
+    soundType: 'highway_trucks',
+    audioSignature: 'High-speed truck engine braking, unmuffled exhaust roar, and arterial expressway noise.',
+    whoComparison: '+52 dB above WHO guideline',
+    primarySources: 'Heavy interprovincial commercial freight corridors dissecting urban sectors, lack of silencers.',
+    natureImpact: 'Disrupts Margalla Hills National Park wildlife corridors; leopards and songbirds avoid foothill edges.',
+    humanImpact: 'High prevalence of stress-induced insomnia and cognitive impairment in schools along Expressway.',
+    solutions: [
+      'Construction of soil berms and planted evergreen acoustic sound walls along the Islamabad Expressway.',
+      'Rigorous roadside acoustic emissions testing for heavy diesel transport trucks.',
+      'Enforcing strict 40 km/h nighttime speed limits with low-noise friction asphalt.'
+    ]
+  },
+  ho_chi_minh_city: {
+    key: 'ho_chi_minh_city',
+    name: 'Ho Chi Minh City',
+    country: 'Vietnam',
+    lat: 10.82,
+    lng: 106.63,
+    rank: 5,
+    dBA: 103,
+    level: 'Severe',
+    color: '#f97316',
+    soundType: 'scooters_swarm',
+    audioSignature: 'Continuous buzzing swarm of millions of two-stroke and four-stroke motorcycles and horn chirps.',
+    whoComparison: '+50 dB above WHO guideline',
+    primarySources: 'Over 8 million registered motorbikes, continuous horn beeping at intersections, street commerce.',
+    natureImpact: 'Saigon riverbank acoustic masking forces local bulbuls and tailorbirds to sing at unnatural higher pitches.',
+    humanImpact: 'Chronic auditory fatigue and elevated cortisol levels among commuter populations.',
+    solutions: [
+      'Electrification of city motorcycle fleets through subsidies for e-scooters and battery-swapping stations.',
+      'Urban green canopy restoration along major boulevards to scatter high-frequency scooter engine noise.',
+      'Expansion of pedestrian-only zones in District 1 and automated acoustic radar enforcement.'
+    ]
+  },
+  delhi: {
+    key: 'delhi',
+    name: 'Delhi',
+    country: 'India',
+    lat: 28.61,
+    lng: 77.21,
+    rank: 7,
+    dBA: 96,
+    level: 'Severe',
+    color: '#f97316',
+    soundType: 'horns_dense',
+    audioSignature: 'Dense gridlock rumble, rhythmic car horn bursts, and construction machinery hum.',
+    whoComparison: '+43 dB above WHO guideline',
+    primarySources: 'Over 12 million registered vehicles, relentless pressure honking, generator sets, and infrastructure expansion.',
+    natureImpact: 'Delhi Ridge urban forest birds have experienced a 40% reduction in breeding success due to acoustic masking.',
+    humanImpact: 'Heightened risk of ischemic heart disease, cognitive developmental delays in roadside schools.',
+    solutions: [
+      '"No Honking" automated camera zones with steep penalties at traffic intersections.',
+      'Installation of transparent acoustic barriers along elevated Delhi Metro lines and flyovers.',
+      'Mandatory living green walls on flyover pillars and expansion of dense urban forest corridors.'
+    ]
+  },
+  cairo: {
+    key: 'cairo',
+    name: 'Cairo',
+    country: 'Egypt',
+    lat: 30.04,
+    lng: 31.24,
+    rank: 8,
+    dBA: 95,
+    level: 'Severe',
+    color: '#f97316',
+    soundType: 'cairo_horns',
+    audioSignature: 'Melodic automotive horn signaling, continuous taxi honks, and reverberant concrete canyons.',
+    whoComparison: '+42 dB above WHO guideline',
+    primarySources: 'Vehicular horns used as primary collision avoidance, congested ring roads, and open wedding sound systems.',
+    natureImpact: 'Nile river corridor bat colonies exhibit foraging confusion and avoid urban riverfront bridge roosts.',
+    humanImpact: 'Widespread sleep disturbance; 65% of downtown Cairo residents report chronic daytime tiredness.',
+    solutions: [
+      'Replacing horn-based driving culture with modern lane markings, roundabouts, and smart traffic lights.',
+      'Low-noise asphalt resurfacing along the Ring Road and 6th of October Bridge.',
+      'Planting dense rows of date palms and acacias as natural sound barriers along highway ramps.'
+    ]
+  },
+  new_york: {
+    key: 'new_york',
+    name: 'New York City',
+    country: 'United States',
+    lat: 40.71,
+    lng: -74.01,
+    rank: 10,
+    dBA: 95,
+    level: 'Severe',
+    color: '#f97316',
+    soundType: 'nyc_sirens',
+    audioSignature: 'Yellow cab horns, emergency siren wails, elevated subway squeals, and wet asphalt rumble.',
+    whoComparison: '+42 dB above WHO guideline',
+    primarySources: 'Subway track curves (wheel-rail friction exceeding 105 dB), emergency sirens, delivery trucks, HVAC chillers.',
+    natureImpact: 'Central Park songbirds (such as American Robins and Song Sparrows) must sing at double volume to be heard.',
+    humanImpact: 'NYC 311 receives over 400,000 noise complaints annually; associated with chronic hypertension.',
+    solutions: [
+      'High-frequency track lubricators and acoustic dampers on sharp subway curves to eliminate wheel squeal.',
+      'Adoption of low-frequency "rumbler" sirens and directional broadband sound signals for emergency vehicles.',
+      'Open-graded friction course (OGFC) porous asphalt on cross-town avenues to absorb tire noise and storm runoff.',
+      'Incentives for green roof installations to absorb acoustic reverberation in high-rise skyscraper street canyons.'
+    ]
+  },
+  istanbul: {
+    key: 'istanbul',
+    name: 'Istanbul',
+    country: 'Turkey',
+    lat: 41.01,
+    lng: 28.98,
+    rank: 15,
+    dBA: 89,
+    level: 'High',
+    color: '#eab308',
+    soundType: 'istanbul_ferry',
+    audioSignature: 'Bosphorus ferry steam horns, seagulls, hill-climbing automotive revs, and historic street rumble.',
+    whoComparison: '+36 dB above WHO guideline',
+    primarySources: 'Heavy shipping traffic through Bosphorus strait, bridge approaches, dense hillside street acoustics.',
+    natureImpact: 'Underwater engine noise masks echolocation and communication of resident Bosphorus harbor porpoises and dolphins.',
+    humanImpact: 'Acoustic fatigue among 16 million residents living near major highway arteries and ferry piers.',
+    solutions: [
+      'Transitioning urban maritime ferries to electric and hybrid propulsion with quiet underwater propeller design.',
+      'Expanding tree-lined green buffers along E-5 and TEM highways.',
+      'Pedestrianizing historic peninsula streets in Fatih and Beyoğlu.'
+    ]
+  },
+  sao_paulo: {
+    key: 'sao_paulo',
+    name: 'São Paulo',
+    country: 'Brazil',
+    lat: -23.55,
+    lng: -46.63,
+    rank: 16,
+    dBA: 88,
+    level: 'High',
+    color: '#eab308',
+    soundType: 'traffic_heavy',
+    audioSignature: 'Avenue gridlock, delivery motorbike buzz, and frequent commercial helicopter rotors overhead.',
+    whoComparison: '+35 dB above WHO guideline',
+    primarySources: 'Over 7 million automobiles, world largest urban helicopter fleet (over 500 aircraft), arterial expressways.',
+    natureImpact: 'Atlantic Forest remnants in Cantareira experience reduced avian dispersal as birds avoid noisy periphery.',
+    humanImpact: 'High incidence of cardiovascular hospitalizations linked to chronic expressway exposure.',
+    solutions: [
+      'Strict altitude and route regulations for urban helicopter corridors away from hospitals and schools.',
+      'Dedicated acoustic barriers on Marginal Tietê and Pinheiros expressways.',
+      'Expansion of exclusive bus rapid transit (BRT) lanes with quiet electric articulated buses.'
+    ]
+  },
+  paris: {
+    key: 'paris',
+    name: 'Paris',
+    country: 'France',
+    lat: 48.86,
+    lng: 2.35,
+    rank: 19,
+    dBA: 83,
+    level: 'Moderate',
+    color: '#eab308',
+    soundType: 'paris_scooters',
+    audioSignature: 'Stone street tire hum, buzzing delivery scooters, café murmur, and gentle Seine rain.',
+    whoComparison: '+30 dB above WHO guideline',
+    primarySources: 'Boulevard Périphérique ring road, delivery scooters on cobblestones, dense limestone street reflections.',
+    natureImpact: 'Parisian blackbirds shift their daily song timing by 2 hours into the pre-dawn quiet to avoid morning traffic noise.',
+    humanImpact: 'Bruitparif sensors document over 80% of residents exposed to levels exceeding European Union thresholds.',
+    solutions: [
+      'Citywide 30 km/h speed limit and progressive pedestrianization of central arrondissements.',
+      'Installation of "Medusa" directional acoustic noise radars that automatically fine excessively loud motorbikes.',
+      'Replacement of noisy street surfaces with whisper-quiet rubberized sound-absorbing asphalt.'
+    ]
+  },
+  london: {
+    key: 'london',
+    name: 'London',
+    country: 'United Kingdom',
+    lat: 51.51,
+    lng: -0.13,
+    rank: 20,
+    dBA: 82,
+    level: 'Moderate',
+    color: '#eab308',
+    soundType: 'london_cabs',
+    audioSignature: 'Diesel black cabs, red double-decker bus hiss, distant Big Ben chimes, and tube vibrations.',
+    whoComparison: '+29 dB above WHO guideline',
+    primarySources: 'Diesel taxis and buses, underground tube ground-borne vibration, Heathrow arrival flight paths.',
+    natureImpact: 'European robins in central London now regularly sing at night under streetlights because day traffic is too loud.',
+    humanImpact: 'Estimated loss of 5,000 disability-adjusted life years (DALYs) annually in Greater London due to environmental noise.',
+    solutions: [
+      'Transition to zero-emission electric black cabs (LEVC) and expanding electric bus fleets.',
+      'Designation of London Quiet Areas and acoustic sanctuaries across Royal Parks.',
+      'Soundproofing grants for homes beneath primary airport approach funnels.'
+    ]
+  },
+  tokyo: {
+    key: 'tokyo',
+    name: 'Tokyo',
+    country: 'Japan',
+    lat: 35.68,
+    lng: 139.76,
+    rank: 23,
+    dBA: 76,
+    level: 'Moderate-Low',
+    color: '#10b981',
+    soundType: 'tokyo_chimes',
+    audioSignature: 'Smooth electric commuter trains, gentle Shibuya crossing acoustic chimes, and disciplined traffic.',
+    whoComparison: '+23 dB above WHO guideline (Remarkably quiet for world\'s largest megacity)',
+    primarySources: 'High-density expressways (Shuto Expressway), elevated commuter rail, construction sites.',
+    natureImpact: 'Abundant Japanese white-eyes and brown-eared bulbuls coexist in neighborhood pocket parks and temple groves.',
+    humanImpact: 'Low honking culture and widespread double-glazed soundproof glass maintain serene indoor environments.',
+    solutions: [
+      'Extensive double-decked tunnel infrastructure routing noisy expressways deep underground.',
+      'Universal adoption of acoustic crosswalk chimes ("Piyo-Piyo" and "Kakko") designed to minimize neighborhood spillage.',
+      'Continuous acoustic vibration absorption pads under Yamanote Line and subway rail tracks.'
+    ]
+  },
+  berlin: {
+    key: 'berlin',
+    name: 'Berlin',
+    country: 'Germany',
+    lat: 52.52,
+    lng: 13.40,
+    rank: 24,
+    dBA: 74,
+    level: 'Low',
+    color: '#10b981',
+    soundType: 'berlin_trams',
+    audioSignature: 'Broad leafy boulevards, quiet electric trams, bicycle bells, and wet cobblestone patter.',
+    whoComparison: '+21 dB above WHO guideline',
+    primarySources: 'Stadtbahn rail viaduct, arterial avenues, localized nightlife clusters in Kreuzberg/Mitte.',
+    natureImpact: 'Berlin nightingales thrive in urban parks (Tiergarten), successfully defending territories with high acoustic complexity.',
+    humanImpact: 'Comprehensive citywide "Lärmaktionsplan" (Noise Action Plan) protecting residential sleep zones.',
+    solutions: [
+      'Grass-covered tram tracks ("Rasenweiche") that absorb rail rattle and improve urban stormwater infiltration.',
+      'Strict 30 km/h nighttime speed limits on over 80% of primary residential roads.',
+      'Expansion of protected bike lanes and green corridor buffers connecting city canals.'
+    ]
+  },
+  singapore: {
+    key: 'singapore',
+    name: 'Singapore',
+    country: 'Singapore',
+    lat: 1.35,
+    lng: 103.82,
+    rank: 25,
+    dBA: 73,
+    level: 'Low',
+    color: '#10b981',
+    soundType: 'singapore_metro',
+    audioSignature: 'Whisper-quiet electric MRT trains, tropical garden canopies, and smooth highway flow.',
+    whoComparison: '+20 dB above WHO guideline',
+    primarySources: 'Expressway transit corridors, construction of high-density housing, tropical air conditioning chillers.',
+    natureImpact: 'Smooth integration of urban green corridors allows hornbills and otters to thrive throughout the city.',
+    humanImpact: 'Aggressive vehicle quota system (COE) caps automobile growth at 0%, preventing unchecked congestion.',
+    solutions: [
+      'Extensive semi-enclosed acoustic noise barriers installed along elevated MRT tracks next to housing estates.',
+      'Biophilic architectural guidelines requiring vertical sky gardens that diffuse canyon sound reflections.',
+      'Subterranean road network (Marina Coastal Expressway) routing heavy freight away from ground level.'
+    ]
+  },
+  oslo: {
+    key: 'oslo',
+    name: 'Oslo',
+    country: 'Norway',
+    lat: 59.91,
+    lng: 10.75,
+    rank: 26,
+    dBA: 69,
+    level: 'Very Low',
+    color: '#10b981',
+    soundType: 'oslo_electric',
+    audioSignature: 'Silent electric vehicles, gentle fjord breezes, quiet electric ferries, and tranquil streets.',
+    whoComparison: '+16 dB above WHO guideline (One of the quietest capitals on Earth)',
+    primarySources: 'Ring 3 expressway, winter studded tire friction on pavement.',
+    natureImpact: 'City parks and fjord shorelines host diverse migratory waterfowl and forest birds undisturbed by transit noise.',
+    humanImpact: 'Exceptionally low cardiovascular and sleep disturbance rates attributed to urban noise.',
+    solutions: [
+      'Over 85% of all new car sales are fully electric, eliminating combustion engine noise at low city speeds.',
+      'Pedestrianized "Car-Free Livability" zone in Oslo city center with removed street parking.',
+      'Electric zero-emission passenger ferries operating silently across the Oslofjord.'
+    ]
+  },
+  amsterdam: {
+    key: 'amsterdam',
+    name: 'Amsterdam',
+    country: 'Netherlands',
+    lat: 52.37,
+    lng: 4.89,
+    rank: 27,
+    dBA: 67,
+    level: 'World Model Benchmark',
+    color: '#10b981',
+    soundType: 'amsterdam_bike',
+    audioSignature: 'Gentle bicycle bell pings, canal water lapping, pedestrian footsteps, and peaceful urban quiet.',
+    whoComparison: '+14 dB above WHO guideline (Lowest noise among major European metropolises)',
+    primarySources: 'A10 highway ring, Schiphol airport departure lanes, localized tourist center nightlife.',
+    natureImpact: 'Urban biodiversity thrives; coots, herons, and song thrushes nest directly along canal walls.',
+    humanImpact: 'High self-reported acoustic satisfaction and healthy active lifestyles with low transport-related stress.',
+    solutions: [
+      'Over 60% of all daily journeys taken by bicycle on dedicated, separated cycling superhighways.',
+      'Citywide 30 km/h speed limit implemented in 2023, cutting urban traffic noise in half (-3 dB).',
+      'Extensive canal-side tree planting (willows and elms) providing natural acoustic diffusion and carbon capture.'
+    ]
+  }
+};
+
+export function getCityNoiseData(locationName, lng, lat) {
+  if (locationName) {
+    const locLower = locationName.toLowerCase();
+    for (const [key, profile] of Object.entries(CITY_NOISE_PROFILES)) {
+      if (locLower.includes(profile.name.toLowerCase()) || locLower.includes(key.replace(/_/g, ' '))) {
+        return profile;
+      }
+    }
+  }
+
+  if (lng != null && lat != null) {
+    for (const profile of Object.values(CITY_NOISE_PROFILES)) {
+      const dLng = lng - profile.lng;
+      const dLat = lat - profile.lat;
+      if (dLng * dLng + dLat * dLat < 0.20) {
+        return profile;
+      }
+    }
+  }
+
+  return null;
+}
+
+
+// ==========================================
+// ACCURATE 1-DEGREE GLOBAL LAND MASK
+// Generated from Natural Earth 110m vector dataset
+// ==========================================
+export const LAND_MASK_B64 = "////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////f///////////////////////////////////////////////////////3x8AAP7///////////////////////////////////////////////////8/AAAA/P///////////////////////////////////////////////////x8AAAAA+P//////////////4f///////////////////////////////////wAAAAAA/v////////////8HAAD4////////////////////////////////HwAAAAAAAP7//////////wf8wD8AwP//////////////////////////////DwAAAAAcgP//////////fwAAAP4BwP//////////////////////////////HwAAAACH////////////PwAAAPgA/////////////////////////////////wcAAADA/////////////wEAAAAA8P///////////////////////////////wAAAAAAAPz//////////z8AAAAAAP///////////////////////////////wAAAAAAAPz///////////8HAAAAAAD+/////////////////////////////wAAAAAAAADwv/MXgP////8fAAAAAADw/////////////////////////////wMAAAAAAAAAYAYA4ON/OPh/AAAAAADw/////////////////////////////x8AAAAAAAAAAAAAAAAAAAB+AAAAAACA/////////////////////////////38AAAAAAAAAAAAAAAAAAP5+AAAAAAAA5v////////////D//////////////38AAAAAAAAAAAAAAAAAAHA/AAAAAAAAAAA8//P//////+D/////////////HwAAAAAAAAAAAAAAAAAAADAfAAAAAAAAAAAAAADw8////wP+////////////AwAAAAAAAAAAAAAAAAAAAAAHAAAAAAAAAAAAAAAAgP///wH4//////////8DAAAAAAAAAAAAAAAAAAAAAAAHAAAAAAAAAAAAAAAAAPD/AADA/////////z8AAAAAAAAAAAAAAAAAAAAAAAAOAAAAAAAAAAAAAAAAAIAfAAAAAAAeeADADwAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH4AAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8AAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4DAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP4BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAP4BAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHgAAAAAAAAAAAAAAAAAAPwHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHAAAAAAAAAAAAAAAAAAAPgHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAMABAAAAAAAAAAAAAAAAAPwfAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAIADAAAAAAAAAAAAAAAAAPwHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOAAAAALAAAAAAAAAAAAAAAAAPw/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYAAAAAAAAAAAAAAAAAPg/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAcAAAAAAAAAAAAAAAAAPj/AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGgAAAA4AAAAAAAAAAAAAAAAAPz/BwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8DAAAIAAAAAAAAAAAAAAAAAPj/BwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP8DAAAEAAAAAAAAAAAAAAAAAPj/BwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwP8DAAACAAAAAAAAAAAAAAAAAPD/OwAAAAAAAAAAgAEAAAAAAAAAAAAAAAcA6P8HAAAAAAAAAAAAAAAAAAAAAPD/fwAAAAAAAAAAwH8AAAAAAAAAAAAAgP8A2P8HAAAAAAAAAAAAAAAAAAAAAOD//wAAAAAAAAAAwP8BAAAAAAAAAAAAAP8D/P8PAAAAAAAAAAAAAAAAAAAAAPD//wEAAAAAAAAAwP8DAAAAAAAAAAAAAP////8fAAAAAAAAAAAAAAAAAAAAAPD//wMAAAAAAAAA4P8HAAAAAAAAAAAAgP////8fAAAAAAAAAAAAAAAAAAAAAOD//wMAAAAAAAAA4P8HAAAAAAAAAAAAgP////8fAAAAAAAAAAAAAAAAAAAAAOD//wcAAAAAAAAA8P8PAAAAAAAAAAAAgP////8/AAAAAAAAAAAAAAAAAAAAAOD//wcAAAAAAAAA+P8fAAAAAAAAAAAAwP////8fAAAAAAAAAAAAAAAAAAAAAOD//wcAAAAAAAAA+P8fAAAAAAAAAAAA4P////8fAAAAAAAAAAAAAAAAAAAAAOD//w8AAAAAAAAA+P8fAAIAAAAAAAAAwP////8fAAAAAAAAAAAAAAAAAAAAAOD//x8AAAAAAAAA+P9/AAcAAAAAAAAA4P////8PAAAAAAAAAAAAAAAAAAAAAMD//38AAAAAAAAA/P9/AA8AAAAAAAAAwP////8HAAAAAAAAAAAAAAAAAAAAAMD///8DAAAAAAAA/P//gA8AAAAAAAAAwP////8DAAAAAAAAAAAAAAAAAAAAAMD///8HAAAAAAAA/P9/gA8AAAAAAAAAgP////8BAAIAAAAAAAAAAAAAAAAAAMD///8PAAAAAAAA/v9/AB8AAAAAAAAAAPz///8BAAEAAAAAAAAAAAAAAAAAAMD///8PAAAAAAAA/v9/AB8AAAAAAAAAAOD//38AAAAAAAAAAAAAAAAAAAAAAMD///8PAAAAAAAA////AB8AAAAAAAAAAMD//z8AAAAAAAAAAAAAAAAAAAAAAOD///8fAAAAAAAA////Ax8AAAAAAAAAAMD//z4AAABAAAAAAAAAAAAAAAAAAPj///8fAAAAAAAA////Dz8AAAAAAAAAAAD/Pz4AAAiAAAAAAAAAAAAAAAAAAP7///8fAAAAAAAA////DzgAAAAAAAAAAAD/DxwAAAAAAAAAAAAAAAAAAAAAAP////8fAAAAAAAA////HzAAAAAAAAAAAADsDxwAAAAAAAAAAAAAAAAAAAAAAP////8fAAAAAAAA/v//HyAAAAAAAAAAAADADwwAAAAAAAAAAAAAAAAAAAAAgP////8/AAAAAAAA/v//HyAAAAAAAAAAAACAHwQAAAAAAAAAAAAAAAAAAAAAgP////9/AAAAAAAA/P//DwAAAAAAAAAAAAAAAQQAAAAAAAAAAAAAAAAAAAAAwP//////AAAAAAAA/v//DwAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAA4P//////AAAAAAAA/v//DwAAAAAAAAAAAAgBAIABMAAAAAAAAAAAAAAAAAAA4P//////AQAAAAAA/v//BwAAAAAAAAAAQFYEAMcAAAAAAAAAAAAAAAAAAAAA8P//////AQAAAAAA/v//BwAAAAAAAACAHwAAwH8ABAAAAAAAAAAAAAAAAAAA+P//////AQAAAAAA////BwAAAAAAAADAAQAAxP+AAAAAAAAAAAAAAAAAAAAA+P//////AQAAAAAA////BwAAAAAAAAAwAEAAxD8NAAAAAAAAAAAAAAAAAAAA+P////8/AAAAAACA////BwAAAAAAAAA4AEAA8B8AAAAAAAAAAAAAAAAAAAAA8P////8fAAAAAACA////DwAAAAAAAAA8wChE/gcAAAAAAAAAAAAAAAAAAAAA+P///38BAAAAAADA////HwAAAAAAAAA+/DkA8gAAAAAAAAAAAAAAAAAAAAAA+P///38AAAAAAADg////PwAAAAAAAAAO/DmAAwAAAAAAAAAAAAAAAAAAAAAA8P///wcAAAAAAADg////PwAAAAAAAAAP/gMAAQAAAAAAAAAAAAAAAAAAAAAA8P///wMAAAAAAADg////fwAAAAAAAIAH/vMQAAAAAAAAAAAAAAAAAAAAAAAA4P///wMAAAAAAADg/////wEAAAAAAIAL/gMQAAAAAAAAAAAAAAAAAAAAAAAA4P///wEAAAAAAADA/////wMAAAAAAMAM+AMAAAAAAAAAAAAAAAAAAAAAAAAAgP///wEAAAAAAADA/////wcAAAAAAGAG4AEAAAAAAAAAAAAAAAAAAAAAAAAAgP///wAAAAAAEAD8/////w8AAAAAADAGwAcAAAAAAAAAAAAAAAAAAAAAAAAAwP//fwAAAAAA/A/+/////x8AAAAAAAAHAAcAAAAAAAAAAAAAAAAAAAAAAAAAgP//AwAAAAAA/v///////x8AAAAwAAADAAMBAAAAAAAAAAAAAAAAAAAAAAAAyP//AQAAAACA/////////z8AAAAwAIAAAEAHAAAAAAAAAAAAAAAAAAAAAAAAz///AAAAAACA/////////z8AAAASAMAAAIACAAAAAAAAAAAAAAAAAAAAAAAAE+9/AAAAAADA/////////38AAAAXAEAgAAQCAAAAAAAAAAAAAAAAAAAAAADAAe9TAAAAAADg/////////34AAAAPAEBwAAgAAAAAAAAAAAAAAAAAAAAAAADAAAgAAAAAAADw////////f2AAAAAPAID4AUACAAAAAAAAAAAAAAAAAAAAAADgAQAAAAAAAAD4////////fwAAAIAPAMD8AQABAAAAAAAAAAAAAAAAAAAAAAD8AAAAAAAAAAD4////////vwcAAIAPAMD/AcAAAAAAAAAAAAAAAAAAAAAAAAD/AQAAAAAAAAD4////////nx8AAMAPAMD/ATAAAAAAAAAAAAAAAAAAAAAAAID/AAAAAAAAAAD4////////j/8AAMAPAMD/ATAAAAAAAAAAAAAAAAAAAAAAAP4PAAAAAAAAAAD4////////h/8BAOA/APz/ADAAAAAAAAAAAAAAAAAAAAAAgP8PAAAAAAAAAADw////////x/8HAOB/APx/ADAAAAAAAAAAAAAAAAAAAAAA8J8PAPwCAAAAAADw////////4/8fAOD/APw/AgAAAAAAAAAAAAAAAQAAAAAA+A8eADgAAAAAAADw////////4f8/AOD/Afw/BgAAAAAAAAAAAAAAAAAAAAAA/AccgAEAAAAAAADw////////8f9/AOD/B/5/AAAAAAAAAAAAAAAAAAAAAAAA+AcAYAAAAAAAAAD4////////+f9/APz/B///BgAAAAAAAAAAAAAAAAAAAAAA/AMAHQAAAAAAAADw////////+P//APz/f///fxAAAAAAAAAAAAAAAAAAAAAA/gMAAAAAAAAAAADw////////+P9/AP///////xEAAAAAAAAAAAAAAAAAAAAQ/wMAAAAAAAAAAADg//////9//n8cgP///////ycAAAAAAAAAAAAAAAAAAACQ/wcACAAAAAAAAADg//////9//r+A/////////wcAAAAAAAAAAAAAAAAAAACI/wcALAAAAAAAAADA//////8//z/g/////////w8AAAAAAAAAAAAAAAAAAADu/wcADgAAAAAAAACA//////8f/x/+/////////x8AAAAAAAAAAAAAAAAAAAD0/w8ABgAAAAAAAAAA/v////+//4///////////z8AAAAAAAAAAAAAAAAAAADy/x8GBgAAAAAAAAAA/P/////v/8///////////z8AAAAAAAAAAAAAAAAAAAD5////BwAAAAAAAAAA/P//f////////////////x8AAAAAAAAAAAAAAAAAAID9////BwAAAAAAAAAA/P//D3+E/////////////z9AAAAAAAAAAAAAAAAAAID/////DwAAAAAAAAAA+P//BwaA/////////////x/AAAAAAAAAAAAAAAAAAMD/////HwAAAAAAAAAA8P9/AACA/////////////x/AAwAAAAAAAAAAAAAAAPD/////fwAAAAAAAAAA4P8/AAAA/////////////w+EGwAAAAAAAAAAAAAAAPj//////wAAAAAAAAAAQPx/AAAA/////////////w8Y/gEAAAAAAAAAAAAAAPz//////wAAAAAAAAAAQOB/AAQ2/////////////x8c8AEAAAAAAAAAAAAAAP7//////wAAAAAAAAAA+AcABob//////////////zccwAEAAAAAAAAAAAAAAP7//////wEAAAAAAAAA+A8AAI7//////////////wMOAAEAAAAAAAAAAAAAAP///////wMAAAAAAAAA+A8wEMf//////////////0cOAAMAAAAAAAAAAAAAAP///////wMAAAAAAAAA+B8wuE/+/////////////98fAAMAAAAAAAAAAAAAAP///////x8AAAAAAAAA+D8Aj//w4f////////////8/AAAAAAAAAAAAAAAAAP///////x8AAAAAAAAA+H+Aw/8AwP////////////9/AA8AAAAAAAAAAAAAAP///////z8AAAAAAAAAcPzH8/8A8P//////////////Bx4AAAAAAAAAAAAAAP////////8MAAAAAAAAAPj/+P8B/P//////////////DwQAAAAAAAAAAAAAAP////////9/AAAAAAAAAPj//f9j/v//////////////HwAAAAAAAAAAAAAAAP////////+XAAAAAAAAAPz///93/P//////////////PwwAAAAAAAAAAAAAAP3///////8HUAAAAAAAAP7/////////////////////fwQAAAAAAAAAAAAAAP7//////38HfgAAAAAAgP///////////////////////wQAAAAAAAAAAAAAYP////////8xLAAAAAAAAPz//////////////////////wwAAAAAAAAAAAAA0P//////////DAAAAAAAgOH//////////////////////w0AAAAAAAAAAAAA8P//////7///FwAAAAAAAB///////////////////////wUAAgAAAAAAAAAA8P//////4///DwAAAAAAGD///////////////////////wUAAwAAAAAAAACA+P//////4///DwAAAAAAOA74/////////////////////wUADwAAAIAAAAAA/v//////8///BwAAAAAAOAcgcP//////////////////HwAAHwAAAAAGAAAA//////8/wP//AAAAAAAAwAOwA/7/////////////////DwCAPwAAAAAwAAAA//////8PgP8/AAAAAAAAwAFwD/7/////////////////PwAAfwAAAADADgDA/////38AgP8/AAAAAAAAwANAH/T//////////////////wAAfgAAAACAAwD8/////38AwP8eAAAAAAAAgAGcH/D//////////////////wEAOAAAAAD8MwD//////x8AwH8MAAAAAAAAAAD+P2D///////////////////95cAAAAID///z//////z8AwD8AAMABAAAAAAD+P/z///////////////////9/wH8AAMD//////////z8AwA8AAPgBAAAAAAD+H/7/////////////////////Of8BAID///////////8AQ8ABAPwBAAAAAAD8P/7///////////////////////9fAAP4///////////BBPAHAP4HAAAAAADg//z///////////////////////9/QID4///////////Pw/0DAP8HAMAfAACA//F//v////////////////////8//vD///////////9fAPwYgP8PAOA/AAAA/+N/8P//////////////////////34H8////////////Afw/gP//AQAAAAAA/v+fH////+//////////////////DwD////////////vh/kPwP//BwAAAAAA/P//H/P//5//////////////////AeD///////8DB8TPB/4AAP///wAAAAAA8P//AwDjf77/////////////////AAD+///h/4//H+/Bg/8BwP7//w8AAAAAwP8fAAAAj9///////////////88/AAD4HwAAAAD8H/D4/38A4P///xMAAAAAAPAHAAAAgN//////////////DwAAAQAAAAAAAO//B3f8/wsA4P///z8AAAAAAAAAAAAPAG////////8f2f8HAAAAAAAAAAAAgN9/xzf8RwAA4P///z8AAAAAAAAAAAAPAB7g//////8fgB8AAAAAAAAAAAAAAP8Ahvc5OwAA8P///38AAAAAAAAAAAAcAADg////34cHAAcAAAAAAAAAAAAAAAAMAAD8AgAA+P////8AAAAAAAAAAABwAAAA/P//AwAAAAAAAAAAAAAAAAAAAIC/g7PfBwAA/v////8AAAAAAAAAAADgBwAAwP//PwAA4B8AAAAAAAAAAAAAADzAgPP5H8D//////38AAAAAAAAAAAAA4AEAAAD+DwAAAAAAAAAAAAAAAAAAAOAQACDwP4D///////8BAAAAPAQAAAAAAAAAAAAYAAAAAAAAAAAAAAAAAAAAAAA4+I73//n///////8AAAAAfwAAAAAAAAAAAAAfAAAAAAAAAAAAAAAAAAAAAAAAAOD//wP8//////8BAACAfx4AAAAAAAAAAP4AAAAAAAAAAAAAAAAAAAAAAAAAAPAH/j/+//////8PAAAAgB0AAHgAAAAAAD8AAAAAAAAAAAAAAAAAAAAAAAAAAAD+///D/////5//AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADA/v8/AOD//z8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADg/wEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const LAND_MASK_BYTES = Uint8Array.from(atob(LAND_MASK_B64), c => c.charCodeAt(0));
+
+export function isCoordinateLand(lng, lat) {
+  const normLng = ((lng + 180) % 360 + 360) % 360 - 180;
+  const clampedLat = Math.max(-89.9, Math.min(89.9, lat));
+  const lngIdx = Math.floor(normLng + 180);
+  const latIdx = Math.floor(clampedLat + 90);
+  const bitIdx = latIdx * 360 + lngIdx;
+  return (LAND_MASK_BYTES[bitIdx >> 3] & (1 << (bitIdx & 7))) !== 0;
+}

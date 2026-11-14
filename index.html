@@ -136,6 +136,16 @@
       </svg>
     </button>
 
+    <!-- Fullscreen Toggle Button -->
+    <button id="btn-fullscreen" class="hud-btn" title="Toggle Fullscreen (F11)">
+      <svg id="fullscreen-icon-expand" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+      </svg>
+      <svg id="fullscreen-icon-compress" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+      </svg>
+    </button>
+
     <!-- Info / Mission Modal Button -->
     <button id="btn-info" class="hud-btn" title="About NASA SVS 5650 & Science">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -169,6 +179,13 @@
     <div id="hud-env-tag" class="hud-env-tag" title="Local habitat ambience: Urban traffic, rural insects, jungle wildlife, or ocean surf">
       <span id="hud-env-icon">🏙️</span>
       <span id="hud-env-label">Urban Ambience</span>
+    </div>
+
+    <!-- Urban Noise Pollution Index Badge (Interactive Flashcard Trigger) -->
+    <div id="hud-noise-badge" class="hud-noise-badge" style="display:none;" title="Click for Urban Noise Ecology & Nature Protection Flashcard">
+      <span class="noise-icon">🔊</span>
+      <span id="hud-noise-text">Noise Index: #1 Dhaka (119 dB)</span>
+      <span class="noise-arrow">→</span>
     </div>
 
     <!-- Animated Logarithmic Rain Intensity Gauge -->
@@ -221,14 +238,16 @@
       <input type="range" id="slider-lofi-vol" class="mixer-slider" min="0" max="1" step="0.01" value="0.55" title="Lo-Fi Chillhop Volume">
     </div>
 
-    <!-- Bumpy Globe Relief Exaggeration -->
-    <div class="bump-selector">
-      <span class="bump-label">3D Relief</span>
-      <div class="bump-pills">
-        <button class="bump-pill" data-level="1.2">1.2x</button>
-        <button class="bump-pill active" data-level="2.6">2.6x</button>
-        <button class="bump-pill" data-level="4.0">4.0x</button>
-      </div>
+    <!-- 3D Relief Elevation Toggle -->
+    <div class="relief-toggle-row">
+      <span class="mixer-label">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span>3D Relief</span>
+      </span>
+      <button id="btn-relief-toggle" class="relief-toggle-btn active" title="Toggle 3D Bumpy Terrain Relief (ON / OFF)">
+        <span class="toggle-indicator"></span>
+        <span id="relief-toggle-label">ON</span>
+      </button>
     </div>
 
     <div class="hud-sub-info">
@@ -306,6 +325,15 @@
   <!-- Zen Mode Toast Notice -->
   <div id="zen-toast" class="zen-toast"></div>
 
+  <!-- Zen Mode Floating Exit Button (Mobile & Desktop) -->
+  <button id="btn-exit-zen" class="exit-zen-btn" title="Exit Zen Mode (Hotkey H or Tap)">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+    </svg>
+    <span>Exit Zen Mode</span>
+  </button>
+
   <!-- ==========================================
        INFO & NASA SVS 5650 DIALOG MODAL
        ========================================== -->
@@ -376,6 +404,75 @@
           Visit Official NASA SVS 5650 Entry
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
         </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       ACOUSTIC ECOLOGY & NOISE POLLUTION FLASHCARD
+       ========================================== -->
+  <div id="noise-modal" class="modal-backdrop">
+    <div class="modal-dialog noise-dialog">
+      <div class="modal-header">
+        <div class="noise-header-title">
+          <span class="noise-title-badge" id="modal-noise-badge">🔊 Noise Rank #1</span>
+          <h2 class="modal-title" id="modal-noise-city">Dhaka, Bangladesh</h2>
+        </div>
+        <button id="close-noise-modal" class="modal-close" aria-label="Close modal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-content">
+        <!-- Decibel Meter Card -->
+        <div class="noise-meter-box">
+          <div class="meter-metric">
+            <span class="meter-num" id="modal-noise-db">119</span>
+            <span class="meter-unit">dBA</span>
+            <span class="meter-level-tag hazardous" id="modal-noise-level">Hazardous</span>
+          </div>
+          <div class="meter-bar-track">
+            <div class="meter-bar-fill" id="modal-noise-bar" style="width: 95%;"></div>
+            <div class="meter-who-marker" title="WHO Safe Guideline: 53 dB">
+              <span class="who-label">WHO 53dB Safe</span>
+            </div>
+          </div>
+          <div class="meter-sub" id="modal-noise-who">+66 dB above WHO Environmental Noise guideline</div>
+        </div>
+
+        <!-- City Sound Profile & Primary Sources -->
+        <div class="noise-section">
+          <h4 class="noise-section-title">🏙️ Urban Sound Profile</h4>
+          <p id="modal-noise-sources" class="noise-desc"></p>
+        </div>
+
+        <!-- Ecological & Biodiversity Impact -->
+        <div class="noise-section nature-card">
+          <h4 class="noise-section-title nature-title">🌿 Ecological & Biodiversity Impact</h4>
+          <p id="modal-noise-nature" class="noise-desc"></p>
+        </div>
+
+        <!-- NASA & UNEP Science-Backed Solutions -->
+        <div class="noise-section solutions-card">
+          <h4 class="noise-section-title solutions-title">🌱 How to Reduce Noise Pollution & Protect Nature</h4>
+          <ul id="modal-noise-solutions" class="noise-solutions-list"></ul>
+        </div>
+
+        <!-- Official Resources & External Links -->
+        <div class="noise-resources">
+          <a href="https://www.unep.org/resources/frontiers-2022-noise-blazes-and-mismatches" target="_blank" rel="noopener noreferrer" class="noise-link-pill">
+            <span>UNEP Frontiers Noise Report</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+          <a href="https://www.who.int/europe/publications/i/item/9789289053563" target="_blank" rel="noopener noreferrer" class="noise-link-pill">
+            <span>WHO Environmental Noise Guidelines</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+          <a href="https://soundscapes2landscapes.org/" target="_blank" rel="noopener noreferrer" class="noise-link-pill">
+            <span>NASA Soundscapes to Landscapes (S2L)</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
       </div>
     </div>
   </div>
