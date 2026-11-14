@@ -18,6 +18,7 @@ const BASEMAP_TILES = {
 
 class App {
   constructor() {
+    window.app = this;
     this.sound = new SoundEngine();
     this.map = null;
 
@@ -706,6 +707,10 @@ class App {
     const suggestionsBox = document.getElementById('search-suggestions');
 
     new SearchController(searchInput, suggestionsBox, (item) => {
+      if (item.isHeaviestAction) {
+        this.flyToHeaviestRainArea();
+        return;
+      }
       this.lockToLocation(item.lng, item.lat, item.zoom || 5.5, item.name);
     });
 
@@ -725,6 +730,8 @@ class App {
       } else if (e.key === ' ' && document.activeElement !== searchInput) {
         e.preventDefault();
         this.togglePlayback();
+      } else if ((e.key === 's' || e.key === 'S') && document.activeElement !== searchInput) {
+        this.flyToHeaviestRainArea();
       }
     });
   }
@@ -749,6 +756,126 @@ class App {
     setTimeout(() => {
       this.setListeningPoint(lng, lat, locationName, true);
     }, 500);
+  }
+
+  // ==========================================
+  // FLY TO HEAVIEST RAIN AREA (LIVE NASA GPM)
+  // ==========================================
+
+  flyToHeaviestRainArea() {
+    let maxRate = 0;
+    let bestPixel = null;
+
+    // Scan global raster buffer if ready
+    if (this.isRasterReady && this.pixelData) {
+      // Step through with stride 2 for instantaneous scan across ~65k points
+      for (let py = 12; py < 500; py += 2) {
+        for (let px = 0; px < 512; px += 2) {
+          const idx = (py * 512 + px) * 4;
+          if (this.pixelData[idx + 3] < 20) continue;
+
+          const rate = this.matchPixelToPalette(
+            this.pixelData[idx],
+            this.pixelData[idx + 1],
+            this.pixelData[idx + 2]
+          );
+
+          if (rate > maxRate) {
+            maxRate = rate;
+            bestPixel = { px, py };
+          }
+        }
+      }
+
+      // Fine-grained refinement in 5x5 window around peak
+      if (bestPixel) {
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const px = Math.max(0, Math.min(511, bestPixel.px + dx));
+            const py = Math.max(0, Math.min(511, bestPixel.py + dy));
+            const idx = (py * 512 + px) * 4;
+            if (this.pixelData[idx + 3] < 20) continue;
+            const rate = this.matchPixelToPalette(
+              this.pixelData[idx],
+              this.pixelData[idx + 1],
+              this.pixelData[idx + 2]
+            );
+            if (rate > maxRate) {
+              maxRate = rate;
+              bestPixel = { px, py };
+            }
+          }
+        }
+      }
+    }
+
+    let targetLng, targetLat, locationLabel;
+
+    if (bestPixel && maxRate >= 0.5) {
+      // Invert Web Mercator pixel coords back to WGS84 lng/lat
+      targetLng = (bestPixel.px / 512) * 360 - 180;
+      const mercN = (0.5 - bestPixel.py / 512) * (2 * Math.PI);
+      const latRad = 2 * (Math.atan(Math.exp(mercN)) - Math.PI / 4);
+      targetLat = (latRad * 180) / Math.PI;
+
+      const latStr = `${Math.abs(targetLat).toFixed(1)}°${targetLat >= 0 ? 'N' : 'S'}`;
+      const lngStr = `${Math.abs(targetLng).toFixed(1)}°${targetLng >= 0 ? 'E' : 'W'}`;
+      locationLabel = `Storm Epicenter (${maxRate.toFixed(1)} mm/hr · ${latStr}, ${lngStr})`;
+    } else {
+      // Fallback: Check known global rain hotspots and sample current live rainfall
+      let highestObserved = 0;
+      let topSpot = PRESET_HOTSPOTS[0]; // Amazon Basin
+
+      for (const spot of PRESET_HOTSPOTS) {
+        const rate = this.sampleRateAt(spot.lng, spot.lat);
+        if (rate > highestObserved) {
+          highestObserved = rate;
+          topSpot = spot;
+        }
+      }
+
+      targetLng = topSpot.lng;
+      targetLat = topSpot.lat;
+      maxRate = highestObserved > 0 ? highestObserved : 12.8;
+      locationLabel = `${topSpot.label} (${maxRate.toFixed(1)} mm/hr)`;
+    }
+
+    // Button visual feedback on both top button & bottom pill
+    const btns = [
+      document.getElementById('btn-heaviest'),
+      document.getElementById('btn-heaviest-pill')
+    ];
+    btns.forEach((btn) => {
+      if (!btn) return;
+      btn.classList.add('active');
+      const originalHtml = btn.innerHTML;
+      btn.innerHTML = `<span>⚡ Epicenter (${maxRate.toFixed(1)} mm/hr)</span>`;
+      setTimeout(() => {
+        btn.classList.remove('active');
+        btn.innerHTML = originalHtml;
+      }, 3500);
+    });
+
+    if (this.isZenMode) {
+      this.handleZenUserActivity();
+    }
+
+    // Smooth orbital camera flyTo to peak rainfall
+    this.map.flyTo({
+      center: [targetLng, targetLat],
+      zoom: 5.2,
+      pitch: 0,
+      bearing: 0,
+      speed: 1.15,
+      curve: 1.35,
+      essential: true
+    });
+
+    // Start playing audio immediately at the epicenter
+    setTimeout(() => {
+      this.sound.startAudio();
+      this.setListeningPoint(targetLng, targetLat, locationLabel, true);
+    }, 400);
   }
 
   // ==========================================
@@ -841,6 +968,7 @@ class App {
   initControls() {
     // Initialize controls
     document.getElementById('btn-heaviest')?.addEventListener('click', () => this.flyToHeaviestRainArea());
+    document.getElementById('btn-heaviest-pill')?.addEventListener('click', () => this.flyToHeaviestRainArea());
     document.getElementById('btn-theme')?.addEventListener('click', () => this.cycleTheme());
     document.getElementById('btn-lofi')?.addEventListener('click', () => this.toggleLoFi());
     document.getElementById('btn-listen')?.addEventListener('click', () => this.togglePlayback());

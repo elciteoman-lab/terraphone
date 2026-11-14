@@ -376,6 +376,27 @@ html[data-theme="dark"] .stars-overlay {
   box-shadow: 0 0 16px rgba(16, 185, 129, 0.4);
 }
 
+/* Heaviest Rain Button */
+.btn-heaviest {
+  font-weight: 650;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.32);
+}
+
+.btn-heaviest:hover {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+}
+
+.btn-heaviest.active {
+  background: #f59e0b;
+  color: #1a0b02;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
+}
+
 /* ==========================================
    BOTTOM LEFT: LIVE RAIN & GAUGE CARD
    ========================================== */
@@ -764,6 +785,26 @@ html[data-theme="dark"] .stars-overlay {
 .hotspot-pill:hover {
   color: var(--text-main);
   background: var(--tag-bg);
+}
+
+.hotspot-pill.heaviest-pill {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  font-weight: 700;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
+}
+
+.hotspot-pill.heaviest-pill:hover {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.25);
+  border-color: rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.4);
+}
+
+.hotspot-pill.heaviest-pill.active {
+  background: #f59e0b;
+  color: #1c0d02;
 }
 
 /* ==========================================

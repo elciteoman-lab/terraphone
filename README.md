@@ -54,6 +54,12 @@
   - Warm **sub-bass** and downtempo **swung lo-fi drum beats** (muffled kick, rimshot snare, brushed hi-hats).
   - Independent volume mixers for Rain and Lo-Fi.
 
+- ⚡ **Fly to Heaviest Rain Area on Earth (Hotkey `S`)**:
+  - Click the **⚡ Heaviest** button in the top capsule or the **⚡ Heaviest Rain** pill in the bottom hotspot bar.
+  - Instantly scans the active live NASA GPM IMERG 512×512 global precipitation grid to locate the highest rain rate epicenter on the planet.
+  - Smoothly flies the 3D globe camera (`flyTo`) directly to the storm eye, sets the listening point, and starts playing the intense downpour/tempest acoustics immediately.
+  - Also searchable directly by typing *"heavy"*, *"storm"*, or *"peak"* in the searchbar.
+
 - 🔍 **Live Searchbar with Instant Autocomplete & Camera Lock**:
   - Instant local search against a curated database of 300+ world cities, capitals, and famously rainy hotspots (Mawsynram, Cherrapunji, Tutunendo, Quibdó, Mt. Waialeale, Bergen, Singapore, etc.).
   - Debounced universal geocoding via OpenStreetMap Nominatim.
@@ -89,6 +95,7 @@
 |-----|--------|
 | `/` | Focus global searchbar |
 | `Space` | Play / Pause audio |
+| `S` | Find & Fly to Heaviest Rain Area on Earth |
 | `L` | Toggle Lo-Fi chillhop mode |
 | `H` | Toggle Zen View (hide/show all HUD capsules) |
 | `Right-Click + Drag` | Tilt and rotate 3D bumpy globe |

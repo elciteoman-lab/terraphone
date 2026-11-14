@@ -62,6 +62,18 @@ export class SearchController {
     const q = query.toLowerCase();
     const results = [];
 
+    // Trigger special action if user types storm / heavy / peak / max
+    if (q.includes('heavy') || q.includes('storm') || q.includes('peak') || q.includes('max') || q.includes('rainiest')) {
+      results.push({
+        score: 9999,
+        name: '⚡ Fly to Heaviest Rain Area on Earth',
+        subtitle: 'Live NASA GPM IMERG 30-min Storm Epicenter',
+        isHeaviestAction: true,
+        tag: 'Live Epicenter',
+        source: 'action'
+      });
+    }
+
     for (const city of CITIES_DATABASE) {
       const name = city.name.toLowerCase();
       const country = city.country.toLowerCase();
