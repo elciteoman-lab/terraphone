@@ -1266,130 +1266,94 @@ html[data-theme="dark"] .stars-overlay {
   margin-top: 2px;
 }
 
-/* Sonar Ping Ripple Marker */
-.map-sonar-ping {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(56, 189, 248, 0.45);
-  border: 2px solid #38bdf8;
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.85);
-  pointer-events: none;
-  animation: sonarWave 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes sonarWave {
-  0% {
-    transform: scale(0.6);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(4.5);
-    opacity: 0;
-  }
-}
-
 /* ==========================================
-   LISTENING POINT TARGET RETICLE CROSSHAIR
+   LISTENING POINT TARGET RETICLE CROSSHAIR (HIGH CONTRAST)
+   Dual-Contrast Tactical Design: Luminous Solar Amber + Crisp Shadow Core
    ========================================== */
 
 .listening-crosshair {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   position: relative;
   pointer-events: none;
   user-select: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.95)) drop-shadow(0 0 1px rgba(0, 0, 0, 1));
 }
 
 .crosshair-ring {
   position: absolute;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  border: 1.5px solid rgba(56, 189, 248, 0.85);
-  box-shadow: 0 0 10px rgba(56, 189, 248, 0.55), inset 0 0 6px rgba(56, 189, 248, 0.25);
-  animation: crosshair-pulse 2.8s ease-in-out infinite;
+  border: 2px solid #fbbf24;
+  outline: 1.5px solid rgba(0, 0, 0, 0.9);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.85), inset 0 0 6px rgba(245, 158, 11, 0.4);
+  animation: crosshair-pulse 2.6s ease-in-out infinite;
 }
 
 .crosshair-center {
   position: absolute;
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #38bdf8;
-  box-shadow: 0 0 8px #38bdf8, 0 0 14px rgba(56, 189, 248, 0.9);
+  background: #ffffff;
+  border: 1.5px solid #000000;
+  box-shadow: 0 0 8px #fbbf24, 0 0 16px rgba(245, 158, 11, 1);
+  z-index: 2;
 }
 
 .crosshair-tick {
   position: absolute;
-  background: #38bdf8;
-  box-shadow: 0 0 6px rgba(56, 189, 248, 0.8);
+  background: #fbbf24;
+  border: 1px solid #000000;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.9);
+  z-index: 1;
 }
 
 .crosshair-tick.tick-top {
-  top: 1px;
+  top: 0px;
   left: 50%;
-  width: 1.5px;
-  height: 6px;
+  width: 2px;
+  height: 8px;
   transform: translateX(-50%);
 }
 
 .crosshair-tick.tick-bottom {
-  bottom: 1px;
+  bottom: 0px;
   left: 50%;
-  width: 1.5px;
-  height: 6px;
+  width: 2px;
+  height: 8px;
   transform: translateX(-50%);
 }
 
 .crosshair-tick.tick-left {
-  left: 1px;
+  left: 0px;
   top: 50%;
-  width: 6px;
-  height: 1.5px;
+  width: 8px;
+  height: 2px;
   transform: translateY(-50%);
 }
 
 .crosshair-tick.tick-right {
-  right: 1px;
+  right: 0px;
   top: 50%;
-  width: 6px;
-  height: 1.5px;
+  width: 8px;
+  height: 2px;
   transform: translateY(-50%);
-}
-
-.crosshair-ping {
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 1.5px solid #38bdf8;
-  animation: crosshair-ping-wave 1.1s cubic-bezier(0, 0, 0.2, 1) forwards;
 }
 
 @keyframes crosshair-pulse {
   0%, 100% {
     transform: scale(1);
-    opacity: 0.85;
+    opacity: 0.9;
   }
   50% {
-    transform: scale(1.15);
+    transform: scale(1.12);
     opacity: 1;
-    border-color: #38bdf8;
-  }
-}
-
-@keyframes crosshair-ping-wave {
-  0% {
-    transform: scale(0.4);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(2.6);
-    opacity: 0;
+    border-color: #fef08a;
   }
 }
 

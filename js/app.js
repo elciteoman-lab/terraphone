@@ -169,15 +169,18 @@ class App {
     // Globe starts centered symmetrically at pitch 0 for wobble-free rotation
     this.map = new maplibregl.Map({
       container: 'map',
+      minZoom: 1.5,
+      maxZoom: 11.5,
       style: {
         version: 8,
         projection: { type: 'globe' },
         sources: {
-          // 1. Elevation-Colored Physical Geography Basemap
+          // 1. Elevation-Colored Physical Geography Basemap (Calibrated maxzoom: 8 for clean GPU bilinear overzoom)
           'base-source': {
             type: 'raster',
             tiles: BASEMAP_TILES.physical,
             tileSize: 256,
+            maxzoom: 8,
             attribution: 'Esri, USGS, NOAA Physical Topography'
           },
           // 2. AWS Open Data 3D Digital Elevation Model (DEM)
@@ -193,7 +196,9 @@ class App {
           'rain-source': {
             type: 'raster',
             tiles: [rainWms],
-            tileSize: 256
+            tileSize: 256,
+            maxzoom: 8,
+            attribution: 'NASA GIBS GPM IMERG'
           }
         },
         layers: [
@@ -696,10 +701,6 @@ class App {
       this.sound.setCityAcoustics(null, false);
     }
 
-    if (triggerRipple) {
-      this.triggerSonarPing(lng, lat);
-    }
-
     if (!this.isListening) {
       this.sound.startAudio();
       this.isListening = true;
@@ -841,22 +842,6 @@ class App {
     this.populateInfocard(rainType, rate);
   }
 
-  triggerSonarPing(lng, lat) {
-    const pingEl = document.createElement('div');
-    pingEl.className = 'map-sonar-ping';
-
-    const marker = new maplibregl.Marker({
-      element: pingEl,
-      anchor: 'center'
-    })
-      .setLngLat([lng, lat])
-      .addTo(this.map);
-
-    setTimeout(() => {
-      marker.remove();
-    }, 1800);
-  }
-
   updateListeningCrosshair(lng, lat) {
     if (!this.map) return;
 
@@ -880,13 +865,6 @@ class App {
         .addTo(this.map);
     } else {
       this.crosshairMarker.setLngLat([lng, lat]);
-    }
-
-    if (this.crosshairEl) {
-      const ping = document.createElement('div');
-      ping.className = 'crosshair-ping';
-      this.crosshairEl.appendChild(ping);
-      setTimeout(() => ping.remove(), 1100);
     }
   }
 
