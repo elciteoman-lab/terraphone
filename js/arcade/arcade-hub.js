@@ -419,9 +419,9 @@ export class ArcadeHub {
     });
 
     // Launch game buttons on cards -> open mission briefing card
-    this.container.querySelectorAll('.arcade-card, .arcade-play-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const gameId = btn.getAttribute('data-game');
+    this.container.querySelectorAll('.arcade-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+        const gameId = card.getAttribute('data-game');
         if (gameId) this.openGameBriefing(gameId);
       });
     });
@@ -434,7 +434,8 @@ export class ArcadeHub {
     document.getElementById('btn-cancel-briefing')?.addEventListener('click', () => {
       this.closeGameBriefing();
     });
-    document.getElementById('btn-start-briefing-mission')?.addEventListener('click', () => {
+    document.getElementById('btn-start-briefing-mission')?.addEventListener('click', (e) => {
+      e.stopPropagation();
       const gid = this.pendingBriefingGameId;
       this.closeGameBriefing();
       if (gid) this.launchGame(gid);
@@ -636,32 +637,35 @@ export class ArcadeHub {
 
     const onExit = () => this.closeActiveGame();
 
-    // Instantiate game
-    switch (gameId) {
-      case 'fireline':
-        this.activeGameInstance = new FirelineGame(canvas, this.audioCtx, onExit);
-        break;
-      case 'heat_escape':
-        this.activeGameInstance = new HeatEscapeGame(canvas, this.audioCtx, onExit);
-        break;
-      case 'cloud_courier':
-        this.activeGameInstance = new CloudCourierGame(canvas, this.audioCtx, onExit);
-        break;
-      case 'ozone_drift':
-        this.activeGameInstance = new OzoneDriftGame(canvas, this.audioCtx, onExit);
-        break;
-      case 'coral_current':
-        this.activeGameInstance = new CoralCurrentGame(canvas, this.audioCtx, onExit);
-        break;
-      case 'last_forest':
-        this.activeGameInstance = new LastForestGame(canvas, this.audioCtx, onExit);
-        break;
-      default:
-        console.warn('Unknown game:', gameId);
-        return;
+    // Instantiate and start game
+    try {
+      switch (gameId) {
+        case 'fireline':
+          this.activeGameInstance = new FirelineGame(canvas, this.audioCtx, onExit);
+          break;
+        case 'heat_escape':
+          this.activeGameInstance = new HeatEscapeGame(canvas, this.audioCtx, onExit);
+          break;
+        case 'cloud_courier':
+          this.activeGameInstance = new CloudCourierGame(canvas, this.audioCtx, onExit);
+          break;
+        case 'ozone_drift':
+          this.activeGameInstance = new OzoneDriftGame(canvas, this.audioCtx, onExit);
+          break;
+        case 'coral_current':
+          this.activeGameInstance = new CoralCurrentGame(canvas, this.audioCtx, onExit);
+          break;
+        case 'last_forest':
+          this.activeGameInstance = new LastForestGame(canvas, this.audioCtx, onExit);
+          break;
+        default:
+          console.warn('Unknown game:', gameId);
+          return;
+      }
+      this.activeGameInstance.start();
+    } catch (err) {
+      console.error(`Failed to launch arcade game [${gameId}]:`, err);
     }
-
-    this.activeGameInstance.start();
   }
 
   closeActiveGame() {

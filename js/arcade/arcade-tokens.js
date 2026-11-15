@@ -73,6 +73,19 @@ export class ArcadeTokensManager {
           if (!parsed.equipped.gliderSkin) parsed.equipped.gliderSkin = 'white';
           if (!parsed.equipped.spiritGlow) parsed.equipped.spiritGlow = 'verdant';
 
+          if (!parsed.highScores) parsed.highScores = {};
+          const defaultGames = {
+            fireline: { score: 0, metric: 'seeds' },
+            heat_escape: { score: 0, metric: 'meters' },
+            cloud_courier: { score: 0, metric: 'gates' },
+            ozone_drift: { score: 0, metric: 'canisters' },
+            coral_current: { score: 0, metric: 'meters' },
+            last_forest: { score: 0, metric: 'meters' }
+          };
+          Object.keys(defaultGames).forEach(gid => {
+            if (!parsed.highScores[gid]) parsed.highScores[gid] = defaultGames[gid];
+          });
+
           return parsed;
         }
       }

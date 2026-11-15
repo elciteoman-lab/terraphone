@@ -966,11 +966,28 @@ html[data-theme="light"] #stars-canvas {
   flex-direction: column;
   gap: 7px;
   padding: 8px 10px;
-  background: rgba(15, 23, 42, 0.7);
+  background: rgba(15, 23, 42, 0.75);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
   backdrop-filter: blur(16px);
   margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.ambience-dropdown-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ambience-dropdown-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ambience-dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
 }
 
 .ambience-dropdown-menu.open {
@@ -1011,6 +1028,20 @@ html[data-theme="light"] #stars-canvas {
   background: var(--accent);
   box-shadow: 0 0 6px var(--accent-glow);
   cursor: pointer;
+}
+
+.submixer-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-family: monospace;
+  min-width: 30px;
+  text-align: right;
+  transition: color 0.15s ease;
+}
+
+.submixer-val.is-off {
+  color: #f87171;
 }
 
 .mixer-slider::-webkit-slider-thumb:hover {

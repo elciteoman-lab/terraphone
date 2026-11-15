@@ -11,6 +11,24 @@
 
 import { arcadeTokens, COSMETICS_CATALOG } from './arcade-tokens.js';
 
+// Safe universal polyfill for CanvasRenderingContext2D.prototype.roundRect
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, radii = 0) {
+    const r = typeof radii === 'number' ? radii : (Array.isArray(radii) ? (radii[0] || 0) : 0);
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h - r);
+    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    this.lineTo(x + r, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - r);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+    this.closePath();
+    return this;
+  };
+}
+
 // ==========================================
 // 03. HEAT ESCAPE (NASA ECOSTRESS 5-LANE SUBWAY RUNNER)
 // ==========================================
@@ -1955,7 +1973,7 @@ export class CloudCourierGame {
     const loop = (t) => {
       if (!this.isRunning) return;
       if (!this.isPaused) {
-        const dt = Math.min(0.05, (t - this.lastTime) / 1000);
+        const dt = Math.min(0.05, Math.max(0.001, (t - (this.lastTime || t)) / 1000 || 0.016));
         this.lastTime = t;
         this.update(dt);
         this.render();
@@ -2188,7 +2206,7 @@ export class OzoneDriftGame {
     const loop = (t) => {
       if (!this.isRunning) return;
       if (!this.isPaused) {
-        const dt = Math.min(0.05, (t - this.lastTime) / 1000);
+        const dt = Math.min(0.05, Math.max(0.001, (t - (this.lastTime || t)) / 1000 || 0.016));
         this.lastTime = t;
         this.update(dt);
         this.render();
@@ -2811,8 +2829,6 @@ export class CoralCurrentGame {
       pop.life -= dt;
     });
     this.damagePopups = this.damagePopups.filter(pop => pop.life > 0);
-
-    arcadeTokens.recordHighScore('coral_current', Math.floor(this.distance), 'meters');
   }
 
   render() {
@@ -3340,7 +3356,7 @@ export class CoralCurrentGame {
     const loop = (t) => {
       if (!this.isRunning) return;
       if (!this.isPaused) {
-        const dt = Math.min(0.05, (t - this.lastTime) / 1000);
+        const dt = Math.min(0.05, Math.max(0.001, (t - (this.lastTime || t)) / 1000 || 0.016));
         this.lastTime = t;
         this.update(dt);
         this.render();
@@ -3660,7 +3676,7 @@ export class LastForestGame {
     const loop = (t) => {
       if (!this.isRunning) return;
       if (!this.isPaused) {
-        const dt = Math.min(0.05, (t - this.lastTime) / 1000);
+        const dt = Math.min(0.05, Math.max(0.001, (t - (this.lastTime || t)) / 1000 || 0.016));
         this.lastTime = t;
         this.update(dt);
         this.render();

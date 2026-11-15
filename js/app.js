@@ -1538,40 +1538,31 @@ class App {
       });
     }
 
-    const trafficSlider = document.getElementById('slider-traffic-vol');
-    if (trafficSlider) {
-      trafficSlider.addEventListener('input', (e) => {
-        this.sound.setTrafficVolume(parseFloat(e.target.value));
-      });
-    }
+    // Bind all 7 Granular Ambience sub-sliders & live percentage readouts
+    const granularConfigs = [
+      { sliderId: 'slider-wind-vol', valId: 'val-wind-vol', setter: (v) => this.sound.setWindVolume(v) },
+      { sliderId: 'slider-habitat-vol', valId: 'val-habitat-vol', setter: (v) => this.sound.setHabitatVolume(v) },
+      { sliderId: 'slider-traffic-vol', valId: 'val-traffic-vol', setter: (v) => this.sound.setTrafficVolume(v) },
+      { sliderId: 'slider-horns-vol', valId: 'val-horns-vol', setter: (v) => this.sound.setHornsVolume(v) },
+      { sliderId: 'slider-animals-vol', valId: 'val-animals-vol', setter: (v) => this.sound.setAnimalsVolume(v) },
+      { sliderId: 'slider-birds-vol', valId: 'val-birds-vol', setter: (v) => this.sound.setBirdsVolume(v) },
+      { sliderId: 'slider-voices-vol', valId: 'val-voices-vol', setter: (v) => this.sound.setVoicesVolume(v) }
+    ];
 
-    const hornsSlider = document.getElementById('slider-horns-vol');
-    if (hornsSlider) {
-      hornsSlider.addEventListener('input', (e) => {
-        this.sound.setHornsVolume(parseFloat(e.target.value));
-      });
-    }
-
-    const animalsSlider = document.getElementById('slider-animals-vol');
-    if (animalsSlider) {
-      animalsSlider.addEventListener('input', (e) => {
-        this.sound.setAnimalsVolume(parseFloat(e.target.value));
-      });
-    }
-
-    const birdsSlider = document.getElementById('slider-birds-vol');
-    if (birdsSlider) {
-      birdsSlider.addEventListener('input', (e) => {
-        this.sound.setBirdsVolume(parseFloat(e.target.value));
-      });
-    }
-
-    const voicesSlider = document.getElementById('slider-voices-vol');
-    if (voicesSlider) {
-      voicesSlider.addEventListener('input', (e) => {
-        this.sound.setVoicesVolume(parseFloat(e.target.value));
-      });
-    }
+    granularConfigs.forEach(({ sliderId, valId, setter }) => {
+      const slider = document.getElementById(sliderId);
+      const valEl = document.getElementById(valId);
+      if (slider) {
+        slider.addEventListener('input', (e) => {
+          const val = parseFloat(e.target.value);
+          setter(val);
+          if (valEl) {
+            valEl.textContent = val <= 0.005 ? 'OFF' : `${Math.round(val * 100)}%`;
+            valEl.classList.toggle('is-off', val <= 0.005);
+          }
+        });
+      }
+    });
 
     if (lofiSlider) {
       lofiSlider.addEventListener('input', (e) => {
