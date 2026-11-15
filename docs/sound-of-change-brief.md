@@ -1,3 +1,5 @@
+> Historical design brief. The current release uses a Manhattan still and a live FFT spectrum. See the implementation for the current presentation.
+
 # EARTH JUKEBOX — GLOBAL RAIN & THE SOUND OF CHANGE
 ## Complete Development Instructions for Antigravity
 

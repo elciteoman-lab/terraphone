@@ -6,6 +6,14 @@
   <title>Terraphone — Live Global Rain, Thunder & Sound of Change | NASA Space Apps Challenge</title>
   <meta name="description" content="Terraphone: Immersive global rain, thunder and atmospheric sound simulator powered by NASA GPM IMERG and NASA SVS 5650, plus The Sound of Change urban noise intervention simulator.">
 
+  <script>
+    try {
+      if (!location.hash && !matchMedia('(prefers-reduced-motion: reduce)').matches && !sessionStorage.getItem('terraphone-intro')) {
+        document.documentElement.classList.add('first-arrival');
+        sessionStorage.setItem('terraphone-intro', '1');
+      }
+    } catch {}
+  </script>
   <!-- MapLibre GL v5 CDN -->
   <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/dist/maplibre-gl.css" rel="stylesheet">
   <script defer src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/dist/maplibre-gl.js"></script>
@@ -18,6 +26,22 @@
 </head>
 <body data-experience="rain">
 
+  <div class="arrival" aria-hidden="true"><span>terraphone</span></div>
+  <script>
+    if (document.documentElement.classList.contains('first-arrival')) {
+      const arrival = document.querySelector('.arrival');
+      const listeners = new AbortController();
+      const finish = () => {
+        document.documentElement.classList.remove('first-arrival');
+        listeners.abort();
+        arrival.remove();
+      };
+      for (const event of ['pointerdown', 'keydown', 'wheel']) {
+        window.addEventListener(event, finish, { once: true, passive: true, signal: listeners.signal });
+      }
+      arrival.addEventListener('animationend', event => { if (event.target === arrival) finish(); });
+    }
+  </script>
   <!-- 3D Bumpy Globe Map Container -->
   <div id="map" role="region" aria-label="Interactive Earth globe. Drag to explore, scroll to zoom, and select a place to listen."></div>
   <div id="lightning-overlay" class="lightning-flash-overlay"></div>
@@ -141,13 +165,58 @@
       <input type="range" id="slider-thunder-vol" aria-label="Thunder volume" class="mixer-slider" min="0" max="1" step="0.01" value="0.80" title="NASA Convective Thunder & Lightning Rumble Volume">
     </div>
 
-    <!-- Location-Dependent Ambience (Human / Animal / Ocean) -->
-    <div class="mixer-group">
-      <span class="mixer-label">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12s1.5-2 4-2 4 2 4 2"/><path d="M9 15c.5.5 1.5 1 3 1s2.5-.5 3-1"/></svg>
-        <span>Ambience</span>
-      </span>
-      <input type="range" id="slider-ambience-vol" aria-label="Ambience volume" class="mixer-slider" min="0" max="1" step="0.01" value="0.70" title="Location Ambience Volume (Urban, Rural, Wildlife, Ocean)">
+    <!-- Location-Dependent Ambience (Granular Sub-Layers Dropdown) -->
+    <div class="mixer-group mixer-group-ambience" id="mixer-group-ambience">
+      <div class="mixer-group-header">
+        <span class="mixer-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12s1.5-2 4-2 4 2 4 2"/><path d="M9 15c.5.5 1.5 1 3 1s2.5-.5 3-1"/></svg>
+          <span>Ambience</span>
+        </span>
+        <button id="btn-ambience-dropdown" aria-controls="ambience-dropdown-menu" aria-expanded="false" class="ambience-dropdown-btn" type="button" title="Granular Ambience Controls (Traffic, Honking, Animals, Birds, Voices)">
+          <span>Layers</span>
+          <svg class="dropdown-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+      </div>
+      <input type="range" id="slider-ambience-vol" aria-label="Ambience volume" class="mixer-slider" min="0" max="1" step="0.01" value="0.70" title="Master Ambience Volume (scales all ambience layers)">
+
+      <!-- Granular Ambience Layers Dropdown Panel -->
+      <div id="ambience-dropdown-menu" class="ambience-dropdown-menu">
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-wind-vol">Wind</label>
+          <input type="range" id="slider-wind-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.40" title="Organic Wind & Breeze Volume">
+          <span class="submixer-val" id="val-wind-vol">40%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-habitat-vol">Habitat</label>
+          <input type="range" id="slider-habitat-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.50" title="Base Habitat Atmosphere (Urban/Forest/Ocean)">
+          <span class="submixer-val" id="val-habitat-vol">50%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-traffic-vol">Traffic</label>
+          <input type="range" id="slider-traffic-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.60" title="Vehicle Traffic Rumble Volume">
+          <span class="submixer-val" id="val-traffic-vol">60%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-horns-vol">Honking</label>
+          <input type="range" id="slider-horns-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.35" title="Horns & City Honking Volume">
+          <span class="submixer-val" id="val-horns-vol">35%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-animals-vol">Animals</label>
+          <input type="range" id="slider-animals-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.50" title="Insects & Woodland Wildlife Volume">
+          <span class="submixer-val" id="val-animals-vol">50%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-birds-vol">Birds</label>
+          <input type="range" id="slider-birds-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.50" title="Canopy Songbirds Chirping Volume">
+          <span class="submixer-val" id="val-birds-vol">50%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-voices-vol">Voices</label>
+          <input type="range" id="slider-voices-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.40" title="Human Voices & Crowd Chatter Volume">
+          <span class="submixer-val" id="val-voices-vol">40%</span>
+        </div>
+      </div>
     </div>
 
     <!-- Lo-Fi Volume -->
@@ -194,7 +263,7 @@
   <div id="sound-of-change-view" class="sound-of-change-view"></div>
 
   <!-- ==========================================
-       EARTH ARCADE: 8 ENVIRONMENTAL EXPLORATION GAMES
+       EARTH ARCADE: 6 ENVIRONMENTAL EXPLORATION GAMES
        ========================================== -->
   <div id="arcade-view" class="arcade-view"></div>
 
@@ -235,9 +304,7 @@
 
         <h3 style="font-size: 14px; margin-top: 14px; color: #34d399;">🏙️ Experience 2: The Sound of Change</h3>
         <p>
-          Explore urban acoustic pollution in New York City (Manhattan) using cinematic 1080p footage generated with <strong>Google Flow</strong>. 
-          Discover how 20 distinct interventions across four major categories can transform a chaotic, high-noise metropolis into a quiet, 
-          healthy urban sanctuary:
+          Listen to a Manhattan street, try 20 planning interventions, and compare the simulated noise index and live 64-band spectrum.
         </p>
         <ul style="padding-left: 20px; font-size: 12.5px; color: var(--text-sub); line-height: 1.6; margin-bottom: 10px;">
           <li><strong>Transportation & Traffic:</strong> Electric transit, low-noise asphalt, speed management, and anti-honking cameras.</li>
@@ -248,15 +315,13 @@
 
         <h3 style="font-size: 14px; margin-top: 14px; color: #f59e0b;">🎮 Experience 3: Earth Arcade</h3>
         <p>
-          Eight environmental exploration games where NASA and NOAA satellite data directly shape procedural worlds:
-          <strong>Rainway</strong> (endless procedural driving in NASA GPM rain with secret Cloud Glider flight), 
+          Six environmental exploration games where NASA and NOAA satellite data directly shape procedural worlds:
           <strong>Fireline</strong> (2.5D isometric forest exploration with NASA FIRMS active fire alerts), 
-          <strong>Heat Escape</strong> (NASA ECOSTRESS land surface temperature), 
-          <strong>Water Keeper</strong> (NASA SMAP soil moisture), 
+          <strong>Heat Escape</strong> (five-lane runner inspired by NASA ECOSTRESS surface temperatures),
           <strong>Cloud Courier</strong> (NASA OMI SO₂/NO₂), 
           <strong>Ozone Drift</strong> (NASA Ozone Watch), 
           <strong>Coral Current</strong> (NOAA Coral Reef Watch), and 
-          <strong>Last Forest</strong> (NASA/USGS Landsat). Earn Zen tokens to unlock custom vehicles and spirit glows!
+          <strong>Last Forest</strong> (NASA/USGS Landsat). Earn Zen tokens to unlock custom cosmetics and spirit glows!
         </p>
 
         <h3 style="font-size: 14px; margin-top: 14px; color: var(--text-main);">📐 Scientifically Responsible Modeling</h3>
@@ -271,7 +336,7 @@
         <p>
           • <code>/</code> Focus global searchbar<br>
           • <code>Space</code> Play / Pause audio soundscape<br>
-          • <code>A</code> Open Earth Arcade (8 NASA Environmental Games)<br>
+          • <code>A</code> Open Earth Arcade (6 environmental games)<br>
           • <code>C</code> Switch between Global Rain & Sound of Change<br>
           • <code>S</code> Find & Fly to Heaviest Rain Area on Earth<br>
           • <code>L</code> Toggle Lo-Fi chillhop mode<br>

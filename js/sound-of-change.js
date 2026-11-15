@@ -3,7 +3,7 @@
  * NASA Space Apps Challenge 2026
  * 
  * Centralized Simulation State, Logarithmic Acoustic Model,
- * Layered 5-Channel Web Audio System & Video Crossfader
+ * Layered city audio & real-time FFT spectrum
  */
 
 import {
@@ -21,8 +21,6 @@ export class SoundOfChangeEngine {
     this.activeInterventions = new Set(); // Set of active intervention ids
     this.perspective = 'outdoor'; // 'outdoor' | 'indoor'
     this.isBeforeMode = false; // When true, forces baseline state for comparison
-    this.splitSliderPosition = 0.5; // For interactive split before/after view
-    this.isSplitModeActive = false;
 
     // Audio State
     this.isPlaying = false;
@@ -48,16 +46,27 @@ export class SoundOfChangeEngine {
 
     // DOM Elements Cache
     this.container = null;
-    this.videoNoisy = null;
-    this.videoQuiet = null;
     this.indexNumberEl = null;
     this.indexBadgeEl = null;
     this.indexDiffEl = null;
     this.activeCountEl = null;
     this.perspectiveLabelEl = null;
 
-    // Animation / RAF
-    this.rafId = null;
+    // CAVA Audio Spectrum Visualizer
+    this.analyser = null;
+    this.cavaCanvas = null;
+    this.cavaCtx = null;
+    this.cavaBars = 64;
+    this.cavaBarValues = new Float32Array(64);
+    this.cavaPeakValues = new Float32Array(64);
+    this.cavaPeakHolds = new Int32Array(64);
+    this.cavaPeakVels = new Float32Array(64);
+    this.cavaDataArray = null;
+    this.cavaRafId = null;
+    this.cavaResizeObserver = null;
+    this.cavaStatusEl = null;
+
+    this.spectrumVisible = true;
   }
 
   /**
@@ -70,7 +79,8 @@ export class SoundOfChangeEngine {
     this.renderLayout();
     this.cacheDomElements();
     this.bindEvents();
-    this.initVideo();
+    this.initVisualizer();
+    this.enter();
     this.updateSimulation();
   }
 
@@ -78,299 +88,75 @@ export class SoundOfChangeEngine {
    * Render the HTML structure for Sound of Change
    */
   renderLayout() {
+    const tabNames = { transport: 'Transport', architecture: 'Buildings', urban_planning: 'City planning', public_awareness: 'Public health' };
+    const channels = { master: 'Master output', traffic: 'Traffic', horns: 'Horns', construction: 'Construction', industry: 'Industry', crowd: 'Crowds', nature: 'Nature' };
     this.container.innerHTML = `
-      <!-- Google Flow Video Background Viewport -->
-      <div class="soc-video-viewport" id="soc-video-viewport">
-        <video id="soc-video-noisy" class="soc-video soc-video-noisy" autoplay loop muted playsinline preload="auto" poster="img/busy_street_preview.jpg">
-          <source src="videos/noisy-city.mp4" type="video/mp4">
-          <source src="People_walking_on_busy_street_e5d487d8_1080p.mp4" type="video/mp4">
-        </video>
-        <video id="soc-video-quiet" class="soc-video soc-video-quiet" autoplay loop muted playsinline preload="auto" poster="img/manhattan_street_preview.jpg">
-          <source src="videos/quiet-city.mp4" type="video/mp4">
-          <source src="People_walking_on_Manhattan_street_3a44dd46_1080p.mp4" type="video/mp4">
-        </video>
-        
-        <!-- Environmental Overlays -->
-        <div class="soc-overlay soc-overlay-vignette"></div>
-        <div class="soc-overlay soc-overlay-green" id="soc-overlay-green"></div>
-        <div class="soc-overlay soc-overlay-barrier" id="soc-overlay-barrier"></div>
-        <div class="soc-overlay soc-overlay-calm" id="soc-overlay-calm"></div>
-
-        <!-- Before/After Split Line (Interactive Slider) -->
-        <div class="soc-split-container" id="soc-split-container" style="display: none;">
-          <div class="soc-split-line" id="soc-split-line">
-            <div class="soc-split-handle" title="Drag to compare Noisy vs Quiet">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            </div>
+      <div class="soc-scroll">
+        <header class="soc-scene">
+          <div class="soc-backdrop" aria-hidden="true">
+            <div id="soc-overlay-calm"></div>
+            <div id="soc-overlay-green"></div>
+            <div id="soc-overlay-barrier"></div>
           </div>
-          <div class="soc-split-badge left">BASELINE NOISY</div>
-          <div class="soc-split-badge right">AFTER INTERVENTIONS</div>
-        </div>
-      </div>
-
-      <!-- Main Interactive Interface Layer -->
-      <div class="soc-ui-layer">
-        
-        <!-- Hero Header -->
-        <header class="soc-header">
-          <div class="soc-header-left">
-            <button id="soc-btn-return-globe" class="soc-btn" style="padding: 4px 10px; font-size: 11px; margin-bottom: 6px;" title="Return to Global Rain 3D Globe (Hotkey C or Esc)">
-              <span style="font-size: 13px;">←</span> <span>Global Rain Globe</span>
-            </button>
-            <div class="soc-location-tag">
-              <span class="soc-live-dot"></span>
-              <span class="soc-city-name">${this.city.name}</span>
-              <span class="soc-coords">${this.city.coords}</span>
-              <span class="soc-nasa-badge" title="NASA Soundscapes to Landscapes bioacoustic remote sensing model">🛰️ NASA S2L Model</span>
-            </div>
-            <p class="soc-city-desc">${this.city.description}</p>
-          </div>
-
-          <!-- Prominent Simulated Noise Index Capsule -->
-          <div class="soc-index-capsule" id="soc-index-capsule">
-            <div class="soc-index-top">
-              <span class="soc-index-title">SIMULATED NOISE INDEX</span>
-              <span class="soc-index-badge" id="soc-index-badge">HIGH NOISE</span>
-            </div>
-            <div class="soc-index-main">
-              <span class="soc-index-num" id="soc-index-num">${this.city.initialIndex}</span>
-              <span class="soc-index-scale">/ 100</span>
-              <div class="soc-index-metrics">
-                <span class="soc-metric-db" id="soc-metric-db">~85 dBA equiv</span>
-                <span class="soc-metric-diff" id="soc-metric-diff">Baseline Level</span>
-              </div>
-            </div>
-            <div class="soc-index-bar">
-              <div class="soc-index-bar-fill" id="soc-index-bar-fill" style="width: 88%;"></div>
-              <div class="soc-who-target" title="WHO Recommended Daytime Guideline: 53 dBA">
-                <span>WHO 53 dB</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Primary Sound & View Controls -->
-          <div class="soc-header-actions">
-            <button id="soc-btn-sound" class="soc-btn soc-btn-primary" title="Start / Pause Soundscape (Spacebar)">
-              <span id="soc-sound-icon" class="soc-btn-icon-svg">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-              </span>
-              <span id="soc-sound-label">Start Soundscape</span>
-            </button>
-
-            <button id="soc-btn-perspective" class="soc-btn" title="Toggle Indoor / Outdoor Perspective">
-              <span id="soc-persp-icon">🚶</span>
-              <span id="soc-persp-label">Outdoor Sidewalk</span>
-            </button>
-
-            <button id="soc-btn-compare" class="soc-btn" title="Compare Baseline vs Interventions">
-              <span id="soc-compare-icon">⚖️</span>
-              <span id="soc-compare-label">Compare (Before)</span>
-            </button>
-
-            <button id="soc-btn-mixer-toggle" class="soc-btn soc-btn-icon" title="Open 5-Channel Audio Mixer">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-            </button>
-          </div>
-        </header>
-
-        <!-- Subheader Quick Actions & Status -->
-        <div class="soc-subbar">
-          <div class="soc-subbar-left">
-            <span class="soc-counter-badge" id="soc-counter-badge">0 of ${INTERVENTIONS.length} Active</span>
-            <span class="soc-health-badge" id="soc-health-badge" style="display: none;">
-              <span>🛡️</span> Personal Hearing Health Protected
-            </span>
-          </div>
-
-          <div class="soc-subbar-right">
-            <button id="soc-btn-apply-all" class="soc-chip-btn" title="Activate all 20 interventions">⚡ Apply All</button>
-            <button id="soc-btn-reset" class="soc-chip-btn" title="Reset all to initial noisy city">🔄 Reset All</button>
-            <button id="soc-btn-split-toggle" class="soc-chip-btn" title="Toggle interactive split slider view">✂️ Split View</button>
-          </div>
-        </div>
-
-        <!-- 4 Intervention Category Tabs & Grid -->
-        <main class="soc-main">
-          <!-- Category Tabs Navigation -->
-          <nav class="soc-tabs" role="tablist" aria-label="Intervention Categories">
-            ${INTERVENTION_CATEGORIES.map((cat, idx) => `
-              <button 
-                class="soc-tab ${idx === 0 ? 'active' : ''}" 
-                role="tab" 
-                aria-selected="${idx === 0}" 
-                data-tab="${cat.id}"
-                id="soc-tab-${cat.id}"
-              >
-                <span class="soc-tab-icon">${cat.icon}</span>
-                <span class="soc-tab-name">${cat.name}</span>
-                <span class="soc-tab-badge" id="soc-tab-count-${cat.id}">0</span>
+          <div class="soc-scene-content">
+            <div class="soc-caption"><i></i> Manhattan, New York</div>
+            <h2 class="soc-title">Sound of<br>Change</h2>
+            <div class="soc-actions">
+              <button id="soc-btn-sound" class="soc-btn soc-btn-primary" aria-pressed="false">
+                <span id="soc-sound-icon" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="m4 2 9 6-9 6z"/></svg></span>
+                <span id="soc-sound-label">Listen</span>
               </button>
-            `).join('')}
+              <button id="soc-btn-perspective" class="soc-btn" aria-pressed="false" title="Switch listening perspective"><span id="soc-persp-label">Outdoors</span></button>
+              <button id="soc-btn-compare" class="soc-btn" aria-pressed="false" title="Compare with the original street">Baseline</button>
+              <button id="soc-btn-mixer-toggle" class="soc-btn soc-mix-button" aria-label="Sound mixer" aria-controls="soc-mixer-drawer" aria-expanded="false" title="Sound mixer">
+                <svg width="17" height="17" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.5" aria-hidden="true"><path d="M3 8h4m4 0h10M3 16h11m4 0h3"/><circle cx="9" cy="8" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+              </button>
+            </div>
+          </div>
+          <section class="soc-meter" aria-label="Simulated noise index and audio spectrum">
+            <div class="soc-meter-heading"><span>Simulated noise index</span><span id="soc-index-badge"></span></div>
+            <div class="soc-reading"><div><strong id="soc-index-num">${this.city.initialIndex}</strong><span class="soc-scale">/ 100</span></div>
+              <div class="soc-delta"><span id="soc-metric-db"></span><span id="soc-metric-diff"></span></div>
+            </div>
+            <div class="soc-spectrum"><canvas id="soc-cava-canvas" aria-label="64-band frequency spectrum of the soundscape"></canvas></div>
+            <div class="soc-frequencies"><span id="soc-cava-status">Spectrum · Paused</span><span>Low → High</span></div>
+          </section>
+        </header>
+        <main class="soc-workbench" aria-labelledby="soc-interventions-title">
+          <div class="soc-tools">
+            <h3 id="soc-interventions-title">Interventions</h3>
+            <div class="soc-batch"><span id="soc-counter-badge"></span><button id="soc-btn-apply-all">Apply all</button><button id="soc-btn-reset">Reset</button></div>
+          </div>
+          <nav class="soc-tabs" role="tablist" aria-label="Intervention categories">
+            ${INTERVENTION_CATEGORIES.map((cat, i) => `
+              <button class="soc-tab ${i === 0 ? 'active' : ''}" role="tab" aria-selected="${i === 0}" tabindex="${i === 0 ? 0 : -1}" data-tab="${cat.id}" id="soc-tab-${cat.id}" aria-controls="soc-panel-${cat.id}">
+                ${tabNames[cat.id]} <span class="soc-tab-badge" id="soc-tab-count-${cat.id}"></span>
+              </button>`).join('')}
           </nav>
-
-          <!-- Category Panels -->
-          <div class="soc-panels">
-            ${INTERVENTION_CATEGORIES.map((cat, idx) => `
-              <div 
-                class="soc-panel ${idx === 0 ? 'active' : ''}" 
-                id="soc-panel-${cat.id}" 
-                role="tabpanel" 
-                aria-labelledby="soc-tab-${cat.id}"
-              >
-                <div class="soc-panel-intro">
-                  <p>${cat.description}</p>
-                </div>
-                
-                <div class="soc-cards-grid">
-                  ${INTERVENTIONS.filter(item => item.category === cat.id).map(item => `
-                    <div class="soc-card" id="soc-card-${item.id}" data-id="${item.id}">
-                      <div class="soc-card-header">
-                        <div class="soc-card-title-row">
-                          <span class="soc-card-icon">${item.icon}</span>
-                          <h4 class="soc-card-title">${item.title}</h4>
-                        </div>
-                        <!-- Accessible Toggle Switch -->
-                        <button 
-                          class="soc-toggle-switch" 
-                          role="switch" 
-                          aria-checked="false" 
-                          id="soc-toggle-${item.id}"
-                          data-id="${item.id}"
-                          title="Toggle ${item.title}"
-                        >
-                          <span class="soc-toggle-knob"></span>
-                        </button>
-                      </div>
-
-                      <p class="soc-card-desc">${item.shortDesc}</p>
-
-                      <div class="soc-card-footer">
-                        <span class="soc-impact-tag">${item.impactBadge}</span>
-                        <span class="soc-channel-tag" title="Target Channel: ${item.soundChannel}">
-                          ${this.getChannelIcon(item.soundChannel)} ${item.soundChannel.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                  `).join('')}
-                </div>
-              </div>
-            `).join('')}
-          </div>
+          ${INTERVENTION_CATEGORIES.map((cat, i) => `
+            <section class="soc-panel ${i === 0 ? 'active' : ''}" id="soc-panel-${cat.id}" role="tabpanel" aria-labelledby="soc-tab-${cat.id}">
+              ${INTERVENTIONS.filter(item => item.category === cat.id).map(item => `
+                <div class="soc-card" id="soc-card-${item.id}" data-id="${item.id}">
+                  <div><h4 id="soc-title-${item.id}">${item.title}</h4><p id="soc-desc-${item.id}">${item.shortDesc}</p></div>
+                  <button class="soc-toggle-switch" role="switch" aria-checked="false" aria-labelledby="soc-title-${item.id}" aria-describedby="soc-desc-${item.id}" id="soc-toggle-${item.id}" data-id="${item.id}"><span></span></button>
+                </div>`).join('')}
+            </section>`).join('')}
+          <p id="soc-health-badge" hidden>Hearing protection is active.</p>
         </main>
-
-        <!-- Slide-Out 5-Channel Audio Mixer Drawer -->
-        <aside class="soc-mixer-drawer" id="soc-mixer-drawer">
-          <div class="soc-mixer-header">
-            <div class="soc-mixer-title-row">
-              <span class="soc-mixer-icon">🎛️</span>
-              <h3>Layered Audio Engine</h3>
-            </div>
-            <button id="soc-btn-close-mixer" class="soc-close-btn" aria-label="Close mixer">✕</button>
-          </div>
-
-          <div class="soc-mixer-content">
-            <div class="soc-mixer-info-card">
-              <p>Each channel has its own dedicated Web Audio GainNode. Interventions physically attenuate individual acoustic sources in real-time.</p>
-            </div>
-
-            <!-- Master Volume -->
-            <div class="soc-mixer-channel master">
-              <div class="soc-channel-info">
-                <span class="soc-ch-label">🔊 Master Output</span>
-                <span class="soc-ch-val" id="soc-val-master">85%</span>
-              </div>
-              <input type="range" id="soc-slider-master" min="0" max="1" step="0.01" value="0.85" class="soc-range-slider">
-            </div>
-
-            <!-- Channel 1: Traffic -->
-            <div class="soc-mixer-channel">
-              <div class="soc-channel-info">
-                <span class="soc-ch-label">🚗 Traffic (Engines & Tires)</span>
-                <span class="soc-ch-val" id="soc-val-traffic">85%</span>
-              </div>
-              <input type="range" id="soc-slider-traffic" min="0" max="1" step="0.01" value="0.85" class="soc-range-slider">
-            </div>
-
-            <!-- Channel: Horns -->
-            <div class="soc-mixer-channel">
-              <div class="soc-channel-info">
-                <span class="soc-ch-label">📢 City Horns & Alarms</span>
-                <span class="soc-ch-val" id="soc-val-horns">80%</span>
-              </div>
-              <input type="range" id="soc-slider-horns" min="0" max="1" step="0.01" value="0.80" class="soc-range-slider">
-            </div>
-
-            <!-- Channel 2: Construction -->
-            <div class="soc-mixer-channel">
-              <div class="soc-channel-info">
-                <span class="soc-ch-label">🏗️ Construction & Jackhammers</span>
-                <span class="soc-ch-val" id="soc-val-construction">75%</span>
-              </div>
-              <input type="range" id="soc-slider-construction" min="0" max="1" step="0.01" value="0.75" class="soc-range-slider">
-            </div>
-
-            <!-- Channel 3: Industry -->
-            <div class="soc-mixer-channel">
-              <div class="soc-channel-info">
-                <span class="soc-ch-label">🏭 Industry & HVAC Chillers</span>
-                <span class="soc-ch-val" id="soc-val-industry">70%</span>
-              </div>
-              <input type="range" id="soc-slider-industry" min="0" max="1" step="0.01" value="0.70" class="soc-range-slider">
-            </div>
-
-            <!-- Channel 4: Crowd & Entertainment -->
-            <div class="soc-mixer-channel">
-              <div class="soc-channel-info">
-                <span class="soc-ch-label">👥 Pedestrians & Venues</span>
-                <span class="soc-ch-val" id="soc-val-crowd">75%</span>
-              </div>
-              <input type="range" id="soc-slider-crowd" min="0" max="1" step="0.01" value="0.75" class="soc-range-slider">
-            </div>
-
-            <!-- Channel 5: Nature (Emerges as noise subsides) -->
-            <div class="soc-mixer-channel nature">
-              <div class="soc-channel-info">
-                <span class="soc-ch-label">🌿 Nature (Birds & Wind)</span>
-                <span class="soc-ch-val" id="soc-val-nature">65%</span>
-              </div>
-              <input type="range" id="soc-slider-nature" min="0" max="1" step="0.01" value="0.65" class="soc-range-slider">
-            </div>
-
-            <!-- Scientific Acoustic Modeling Formula Card -->
-            <div class="soc-science-card">
-              <span class="soc-science-title">📐 Logarithmic Acoustic Physics</span>
-              <p>Sound levels combine logarithmically via acoustic pressure:</p>
-              <code>L_total = 10 · log10( Σ 10^(Li / 10) )</code>
-              <p class="soc-science-sub">Linear addition is physically incorrect. A 3 dB decrease represents a 50% cut in acoustic sound energy.</p>
-            </div>
-          </div>
-        </aside>
-
       </div>
-    `;
-  }
-
-  getChannelIcon(ch) {
-    const icons = {
-      traffic: '🚗',
-      horns: '📢',
-      indoor: '🪟',
-      nature: '🌿',
-      industry: '🏭',
-      construction: '🏗️',
-      crowd: '👥',
-      health: '🎧'
-    };
-    return icons[ch] || '🔊';
+      <aside class="soc-mixer-drawer" id="soc-mixer-drawer" aria-label="Sound mixer" inert>
+        <div class="soc-mixer-heading"><h3>Sound mixer</h3><button id="soc-btn-close-mixer" aria-label="Close mixer">×</button></div>
+        ${Object.entries(channels).map(([id, name]) => {
+          const value = id === 'master' ? this.masterVolume : this.channelVolumes[id];
+          return `<div class="soc-mixer-channel"><label for="soc-slider-${id}">${name}</label><output id="soc-val-${id}" for="soc-slider-${id}">${Math.round(value * 100)}%</output>
+            <input type="range" id="soc-slider-${id}" min="0" max="1" step="0.01" value="${value}"></div>`;
+        }).join('')}
+      </aside>`;
   }
 
   cacheDomElements() {
-    this.videoNoisy = document.getElementById('soc-video-noisy');
-    this.videoQuiet = document.getElementById('soc-video-quiet');
     this.indexNumberEl = document.getElementById('soc-index-num');
     this.indexBadgeEl = document.getElementById('soc-index-badge');
-    this.indexBarFillEl = document.getElementById('soc-index-bar-fill');
     this.indexMetricDb = document.getElementById('soc-metric-db');
     this.indexDiffEl = document.getElementById('soc-metric-diff');
     this.activeCountEl = document.getElementById('soc-counter-badge');
@@ -379,8 +165,9 @@ export class SoundOfChangeEngine {
     this.overlayBarrier = document.getElementById('soc-overlay-barrier');
     this.overlayCalm = document.getElementById('soc-overlay-calm');
     this.mixerDrawer = document.getElementById('soc-mixer-drawer');
-    this.splitContainer = document.getElementById('soc-split-container');
-    this.splitLine = document.getElementById('soc-split-line');
+    this.cavaCanvas = document.getElementById('soc-cava-canvas');
+    this.cavaCtx = this.cavaCanvas ? this.cavaCanvas.getContext('2d') : null;
+    this.cavaStatusEl = document.getElementById('soc-cava-status');
   }
 
   bindEvents() {
@@ -392,15 +179,28 @@ export class SoundOfChangeEngine {
         tabs.forEach(t => {
           t.classList.remove('active');
           t.setAttribute('aria-selected', 'false');
+          t.tabIndex = -1;
         });
         tab.classList.add('active');
         tab.setAttribute('aria-selected', 'true');
+        tab.tabIndex = 0;
 
         const panels = this.container.querySelectorAll('.soc-panel');
         panels.forEach(p => p.classList.remove('active'));
         const activePanel = document.getElementById(`soc-panel-${targetId}`);
         if (activePanel) activePanel.classList.add('active');
       });
+    });
+
+    this.container.querySelector('.soc-tabs').addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      const index = Array.from(tabs).indexOf(document.activeElement);
+      if (index < 0) return;
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].focus();
+      tabs[next].click();
     });
 
     // 2. Intervention Toggle Switches
@@ -410,13 +210,6 @@ export class SoundOfChangeEngine {
         e.stopPropagation();
         const id = btn.dataset.id;
         this.toggleIntervention(id);
-      });
-      btn.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          const id = btn.dataset.id;
-          this.toggleIntervention(id);
-        }
       });
     });
 
@@ -431,14 +224,6 @@ export class SoundOfChangeEngine {
       });
     });
 
-    // Return to Globe button
-    const btnReturn = document.getElementById('soc-btn-return-globe');
-    if (btnReturn) {
-      btnReturn.addEventListener('click', () => {
-        window.app?.switchExperience('rain');
-      });
-    }
-
     // 3. Audio Play / Pause Button
     const btnSound = document.getElementById('soc-btn-sound');
     if (btnSound) {
@@ -450,17 +235,9 @@ export class SoundOfChangeEngine {
     if (btnPersp) {
       btnPersp.addEventListener('click', () => {
         this.perspective = this.perspective === 'outdoor' ? 'indoor' : 'outdoor';
-        const iconEl = document.getElementById('soc-persp-icon');
-        const labelEl = document.getElementById('soc-persp-label');
-        if (this.perspective === 'indoor') {
-          if (iconEl) iconEl.textContent = '🏠';
-          if (labelEl) labelEl.textContent = 'Indoor Apartment';
-          btnPersp.classList.add('active');
-        } else {
-          if (iconEl) iconEl.textContent = '🚶';
-          if (labelEl) labelEl.textContent = 'Outdoor Sidewalk';
-          btnPersp.classList.remove('active');
-        }
+        const indoor = this.perspective === 'indoor';
+        btnPersp.setAttribute('aria-pressed', String(indoor));
+        document.getElementById('soc-persp-label').textContent = indoor ? 'Indoors' : 'Outdoors';
         this.updateSimulation();
       });
     }
@@ -470,14 +247,6 @@ export class SoundOfChangeEngine {
     if (btnCompare) {
       btnCompare.addEventListener('click', () => {
         this.isBeforeMode = !this.isBeforeMode;
-        const labelEl = document.getElementById('soc-compare-label');
-        if (this.isBeforeMode) {
-          btnCompare.classList.add('active');
-          if (labelEl) labelEl.textContent = 'Viewing: Baseline (Noisy)';
-        } else {
-          btnCompare.classList.remove('active');
-          if (labelEl) labelEl.textContent = 'Compare (Before)';
-        }
         this.updateSimulation();
       });
     }
@@ -488,7 +257,6 @@ export class SoundOfChangeEngine {
       btnApplyAll.addEventListener('click', () => {
         INTERVENTIONS.forEach(item => this.activeInterventions.add(item.id));
         this.isBeforeMode = false;
-        if (btnCompare) btnCompare.classList.remove('active');
         this.updateSimulation();
       });
     }
@@ -498,75 +266,27 @@ export class SoundOfChangeEngine {
       btnReset.addEventListener('click', () => {
         this.activeInterventions.clear();
         this.isBeforeMode = false;
-        if (btnCompare) btnCompare.classList.remove('active');
         this.updateSimulation();
       });
     }
 
-    // 7. Split View Toggle
-    const btnSplit = document.getElementById('soc-btn-split-toggle');
-    if (btnSplit) {
-      btnSplit.addEventListener('click', () => {
-        this.isSplitModeActive = !this.isSplitModeActive;
-        if (this.splitContainer) {
-          this.splitContainer.style.display = this.isSplitModeActive ? 'block' : 'none';
-        }
-        btnSplit.classList.toggle('active', this.isSplitModeActive);
-        this.updateVideoBlend();
-      });
-    }
-
-    // Interactive Split Slider dragging
-    if (this.splitContainer) {
-      let isDragging = false;
-      const updateSplitFromX = (clientX) => {
-        const rect = this.splitContainer.getBoundingClientRect();
-        const pos = Math.max(0.05, Math.min(0.95, (clientX - rect.left) / rect.width));
-        this.splitSliderPosition = pos;
-        if (this.splitLine) this.splitLine.style.left = `${pos * 100}%`;
-        this.updateVideoBlend();
-      };
-
-      this.splitContainer.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        updateSplitFromX(e.clientX);
-      });
-      window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        updateSplitFromX(e.clientX);
-      });
-      window.addEventListener('mouseup', () => {
-        isDragging = false;
-      });
-      // Touch support
-      this.splitContainer.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 0) {
-          isDragging = true;
-          updateSplitFromX(e.touches[0].clientX);
-        }
-      }, { passive: true });
-      window.addEventListener('touchmove', (e) => {
-        if (!isDragging || e.touches.length === 0) return;
-        updateSplitFromX(e.touches[0].clientX);
-      }, { passive: true });
-      window.addEventListener('touchend', () => {
-        isDragging = false;
-      });
-    }
-
-    // 8. Mixer Drawer Toggle & Close
+    // 7. Mixer Drawer Toggle & Close
     const btnMixerToggle = document.getElementById('soc-btn-mixer-toggle');
     const btnCloseMixer = document.getElementById('soc-btn-close-mixer');
-    if (btnMixerToggle && this.mixerDrawer) {
-      btnMixerToggle.addEventListener('click', () => {
-        this.mixerDrawer.classList.toggle('open');
-      });
-    }
-    if (btnCloseMixer && this.mixerDrawer) {
-      btnCloseMixer.addEventListener('click', () => {
-        this.mixerDrawer.classList.remove('open');
-      });
-    }
+    const showMixer = open => {
+      this.mixerDrawer.inert = !open;
+      this.mixerDrawer.classList.toggle('open', open);
+      btnMixerToggle.setAttribute('aria-expanded', String(open));
+      (open ? btnCloseMixer : btnMixerToggle).focus();
+    };
+    btnMixerToggle.addEventListener('click', () => showMixer(this.mixerDrawer.inert));
+    btnCloseMixer.addEventListener('click', () => showMixer(false));
+    this.mixerDrawer.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        showMixer(false);
+      }
+    });
 
     // 9. Mixer Sliders
     this.bindMixerSliders();
@@ -740,6 +460,8 @@ export class SoundOfChangeEngine {
   updateSimulation() {
     const state = this.calculateAcousticState();
 
+    document.getElementById('soc-btn-compare')?.setAttribute('aria-pressed', String(this.isBeforeMode));
+
     // 1. Update Switches & Cards UI
     INTERVENTIONS.forEach(item => {
       const toggle = document.getElementById(`soc-toggle-${item.id}`);
@@ -769,60 +491,24 @@ export class SoundOfChangeEngine {
     // 3. Update Active Counter Badge
     if (this.activeCountEl) {
       const count = this.activeInterventions.size;
-      this.activeCountEl.textContent = `${count} of ${INTERVENTIONS.length} Active`;
+      this.activeCountEl.textContent = `${count} / ${INTERVENTIONS.length} active`;
       this.activeCountEl.classList.toggle('active', count > 0);
     }
 
     // 4. Update Personal Hearing Health Badge
     if (this.healthBadgeEl) {
-      this.healthBadgeEl.style.display = state.isHearingHealthActive ? 'inline-flex' : 'none';
+      this.healthBadgeEl.hidden = !state.isHearingHealthActive;
     }
 
     // 5. Update Simulated Noise Index Gauge
     if (this.indexNumberEl) {
       this.indexNumberEl.textContent = state.index;
     }
-    if (this.indexBarFillEl) {
-      this.indexBarFillEl.style.width = `${Math.min(100, state.index)}%`;
-      // Dynamic color depending on noise index
-      if (state.index >= 75) {
-        this.indexBarFillEl.style.background = 'linear-gradient(90deg, #f97316, #ef4444)';
-      } else if (state.index >= 55) {
-        this.indexBarFillEl.style.background = 'linear-gradient(90deg, #eab308, #f59e0b)';
-      } else {
-        this.indexBarFillEl.style.background = 'linear-gradient(90deg, #10b981, #38bdf8)';
-      }
-    }
-
     if (this.indexBadgeEl) {
-      if (state.index >= 75) {
-        this.indexBadgeEl.textContent = 'HIGH NOISE';
-        this.indexBadgeEl.className = 'soc-index-badge high';
-      } else if (state.index >= 55) {
-        this.indexBadgeEl.textContent = 'MODERATE NOISE';
-        this.indexBadgeEl.className = 'soc-index-badge moderate';
-      } else if (state.index >= 40) {
-        this.indexBadgeEl.textContent = 'CALM & LIVABLE';
-        this.indexBadgeEl.className = 'soc-index-badge good';
-      } else {
-        this.indexBadgeEl.textContent = 'ACOUSTIC SANCTUARY';
-        this.indexBadgeEl.className = 'soc-index-badge tranquil';
-      }
+      this.indexBadgeEl.textContent = state.index >= 75 ? 'High' : state.index >= 55 ? 'Moderate' : 'Low';
     }
-
-    if (this.indexMetricDb) {
-      this.indexMetricDb.textContent = `~${state.dbDisplay} dBA equiv`;
-    }
-
-    if (this.indexDiffEl) {
-      if (state.reduction > 0) {
-        this.indexDiffEl.textContent = `↓ -${state.reduction} pts (${state.reduction > 15 ? 'Significant Relief' : 'Noticeable Improvement'})`;
-        this.indexDiffEl.style.color = '#34d399';
-      } else {
-        this.indexDiffEl.textContent = 'Baseline Level';
-        this.indexDiffEl.style.color = 'var(--text-sub)';
-      }
-    }
+    if (this.indexMetricDb) this.indexMetricDb.textContent = `≈ ${state.dbDisplay} dBA`;
+    if (this.indexDiffEl) this.indexDiffEl.textContent = state.reduction > 0 ? `−${state.reduction} from baseline` : 'Baseline';
 
     // 6. Update Environmental Overlays
     if (this.overlayGreen) {
@@ -836,75 +522,155 @@ export class SoundOfChangeEngine {
       this.overlayCalm.style.opacity = calmAlpha;
     }
 
-    // 7. Update Video Blend
-    this.updateVideoBlend(state.quietFactor);
-
-    // 8. Update Web Audio Engine
+    // 7. Update Web Audio Engine
     this.applyAudioState(state);
   }
 
-  /**
-   * Video crossfade coordination between Noisy and Quiet Google Flow footage
-   */
-  initVideo() {
-    if (this.videoNoisy) {
-      this.videoNoisy.play().catch(e => console.log('[SOC] Video play prevented:', e));
+  // ==========================================
+  // CAVA AUDIO SPECTRUM VISUALIZER ENGINE
+  // ==========================================
+
+  initVisualizer() {
+    this.cavaCanvas = document.getElementById('soc-cava-canvas');
+    if (!this.cavaCanvas) return;
+    this.cavaCtx = this.cavaCanvas.getContext('2d');
+
+    const updateSize = () => {
+      if (!this.cavaCanvas) return;
+      const wrap = this.cavaCanvas.parentElement;
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const targetW = Math.max(1, Math.floor(rect.width * dpr));
+      const targetH = Math.max(1, Math.floor(rect.height * dpr));
+
+      if (this.cavaCanvas.width !== targetW || this.cavaCanvas.height !== targetH) {
+        this.cavaCanvas.width = targetW;
+        this.cavaCanvas.height = targetH;
+      }
+    };
+
+    updateSize();
+
+    if (window.ResizeObserver) {
+      if (this.cavaResizeObserver) this.cavaResizeObserver.disconnect();
+      this.cavaResizeObserver = new ResizeObserver(() => updateSize());
+      const wrap = this.cavaCanvas.parentElement;
+      if (wrap) this.cavaResizeObserver.observe(wrap);
     }
-    if (this.videoQuiet) {
-      this.videoQuiet.play().catch(e => console.log('[SOC] Video play prevented:', e));
+
+    if ('IntersectionObserver' in window) {
+      this.spectrumObserver = new IntersectionObserver(([entry]) => {
+        this.spectrumVisible = entry.isIntersecting;
+        this.syncSpectrum();
+      });
+      this.spectrumObserver.observe(this.cavaCanvas);
     }
-    this.updateVideoBlend(this.calculateAcousticState().quietFactor);
+    this.onVisibility = () => this.syncSpectrum();
+    document.addEventListener('visibilitychange', this.onVisibility);
+  }
+
+  enter() {
+    this.inView = true;
+    this.syncSpectrum();
   }
 
   leave() {
+    this.inView = false;
     this.pauseAudio();
-    this.videoNoisy?.pause();
-    this.videoQuiet?.pause();
-  }
-
-  updateVideoBlend(quietFactor = 0) {
-    if (!this.videoNoisy || !this.videoQuiet) return;
-
-    if (this.isSplitModeActive) {
-      // Split view mode: both videos visible side-by-side cleanly clipped
-      this.videoNoisy.style.display = 'block';
-      this.videoQuiet.style.display = 'block';
-      this.videoNoisy.style.visibility = 'visible';
-      this.videoQuiet.style.visibility = 'visible';
-      const pct = this.splitSliderPosition * 100;
-      this.videoNoisy.style.clipPath = `polygon(0% 0%, ${pct}% 0%, ${pct}% 100%, 0% 100%)`;
-      this.videoQuiet.style.clipPath = `polygon(${pct}% 0%, 100% 0%, 100% 100%, ${pct}% 100%)`;
-      this.videoNoisy.style.opacity = '1';
-      this.videoQuiet.style.opacity = '1';
-    } else {
-      // Normal single-viewport mode: NEVER alpha-blend two live pedestrian clips!
-      this.videoNoisy.style.clipPath = 'none';
-      this.videoQuiet.style.clipPath = 'none';
-
-      // If quietFactor >= 0.40 and not in baseline before-mode, show Quiet city; otherwise show Noisy city
-      const showQuiet = !this.isBeforeMode && quietFactor >= 0.40;
-
-      if (showQuiet) {
-        this.videoQuiet.style.display = 'block';
-        this.videoQuiet.style.visibility = 'visible';
-        this.videoQuiet.style.opacity = '1';
-
-        this.videoNoisy.style.opacity = '0';
-        this.videoNoisy.style.visibility = 'hidden';
-        this.videoNoisy.style.display = 'none';
-      } else {
-        this.videoNoisy.style.display = 'block';
-        this.videoNoisy.style.visibility = 'visible';
-        this.videoNoisy.style.opacity = '1';
-
-        this.videoQuiet.style.opacity = '0';
-        this.videoQuiet.style.visibility = 'hidden';
-        this.videoQuiet.style.display = 'none';
-      }
+    if (this.mixerDrawer) {
+      this.mixerDrawer.classList.remove('open');
+      this.mixerDrawer.inert = true;
+      document.getElementById('soc-btn-mixer-toggle')?.setAttribute('aria-expanded', 'false');
     }
   }
 
-  // ==========================================
+  syncSpectrum() {
+    const active = this.inView && this.isPlaying && this.spectrumVisible && !document.hidden;
+    if (this.cavaStatusEl) this.cavaStatusEl.textContent = this.isPlaying ? 'Live spectrum' : 'Spectrum · Paused';
+    if (!active) {
+      if (this.cavaRafId != null) cancelAnimationFrame(this.cavaRafId);
+      this.cavaRafId = null;
+      if (!this.isPlaying && this.cavaCtx) {
+        this.cavaCtx.clearRect(0, 0, this.cavaCanvas.width, this.cavaCanvas.height);
+        this.cavaBarValues.fill(0);
+        this.cavaPeakValues.fill(0);
+      }
+      return;
+    }
+    if (this.cavaRafId != null) return;
+    let last = performance.now();
+    const frame = time => {
+      this.renderCavaFrame(Math.min(.08, (time - last) / 1000));
+      last = time;
+      this.cavaRafId = requestAnimationFrame(frame);
+    };
+    this.cavaRafId = requestAnimationFrame(frame);
+  }
+
+  renderCavaFrame(dt) {
+    if (!this.cavaCanvas || !this.cavaCtx) return;
+    const ctx = this.cavaCtx;
+    const w = this.cavaCanvas.width;
+    const h = this.cavaCanvas.height;
+    if (w <= 0 || h <= 0) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // Clear frame
+    ctx.clearRect(0, 0, w, h);
+
+    if (!this.analyser || !this.cavaDataArray) return;
+    this.analyser.getByteFrequencyData(this.cavaDataArray);
+    const barCount = this.cavaBars;
+    for (let i = 0; i < barCount; i++) {
+      const start = this.cavaBinEdges[i];
+      const end = Math.max(start + 1, this.cavaBinEdges[i + 1]);
+      let energy = 0;
+      for (let bin = start; bin < end; bin++) energy += this.cavaDataArray[bin];
+      const rawVal = energy / ((end - start) * 255);
+
+      // Fast explosive attack on transients (snappy, jumpy, real audio)
+      if (rawVal > this.cavaBarValues[i]) {
+        this.cavaBarValues[i] = this.cavaBarValues[i] * 0.12 + rawVal * 0.88;
+      } else {
+        // Fast gravity falloff (3.2 per second)
+        this.cavaBarValues[i] = Math.max(0.01, this.cavaBarValues[i] - 3.2 * dt);
+      }
+
+      // Floating Peak Cap Physics (Signature CAVA terminal feature)
+      if (this.cavaBarValues[i] >= this.cavaPeakValues[i]) {
+        this.cavaPeakValues[i] = this.cavaBarValues[i];
+        this.cavaPeakHolds[i] = 7; // Hold frames at peak
+        this.cavaPeakVels[i] = 0;
+      } else {
+        if (this.cavaPeakHolds[i] > 0) {
+          this.cavaPeakHolds[i]--;
+        } else {
+          this.cavaPeakVels[i] += 5.5 * dt; // Gravity acceleration
+          this.cavaPeakValues[i] = Math.max(0.01, this.cavaPeakValues[i] - this.cavaPeakVels[i] * dt);
+        }
+      }
+    }
+
+    // Geometry calculations
+    const gap = Math.max(2 * dpr, Math.floor(w / (barCount * 10)));
+    const totalGap = gap * (barCount - 1);
+    const barWidth = Math.max(2 * dpr, (w - totalGap) / barCount);
+    const usableHeight = h - 10 * dpr;
+
+    ctx.fillStyle = '#bbd6ca';
+    for (let i = 0; i < barCount; i++) {
+      const height = Math.max(dpr, this.cavaBarValues[i] * usableHeight);
+      ctx.fillRect(i * (barWidth + gap), h - height, barWidth, height);
+    }
+    ctx.fillStyle = '#f0b27e';
+    for (let i = 0; i < barCount; i++) {
+      const peak = this.cavaPeakValues[i];
+      if (peak > .02) ctx.fillRect(i * (barWidth + gap), Math.max(0, h - peak * usableHeight - 3 * dpr), barWidth, 2 * dpr);
+    }
+  }
+
   // WEB AUDIO API SYSTEM
   // ==========================================
 
@@ -913,7 +679,7 @@ export class SoundOfChangeEngine {
 
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!this.audioCtx) {
-      this.audioCtx = new AudioCtx();
+      this.audioCtx = window.app?.sound?.getSharedContext() ?? new AudioCtx();
     }
     if (this.audioCtx.state === 'suspended') {
       this.audioCtx.resume();
@@ -925,6 +691,22 @@ export class SoundOfChangeEngine {
     this.masterGain = this.audioCtx.createGain();
     this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.masterVolume, now);
     this.masterGain.connect(this.audioCtx.destination);
+
+    // CAVA Spectrum Analyser (Real-time FFT audio stream)
+    if (!this.analyser) {
+      this.analyser = this.audioCtx.createAnalyser();
+      this.analyser.fftSize = 512;
+      this.analyser.smoothingTimeConstant = 0.40;
+      this.analyser.minDecibels = -85;
+      this.analyser.maxDecibels = -8;
+      this.masterGain.connect(this.analyser);
+      this.cavaDataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      // Precompute perceptual bands once for the actual device sample rate.
+      const binHz = this.audioCtx.sampleRate / this.analyser.fftSize;
+      const maxHz = Math.min(16000, this.audioCtx.sampleRate / 2);
+      this.cavaBinEdges = Uint16Array.from({ length: this.cavaBars + 1 }, (_, i) =>
+        Math.min(this.cavaDataArray.length - 1, Math.floor(700 * Math.expm1(i / this.cavaBars * Math.log1p(maxHz / 700)) / binHz)));
+    }
 
     // Indoor/Outdoor Acoustic Biquad Filter (Simulates building facade sound transmission)
     this.indoorFilter = this.audioCtx.createBiquadFilter();
@@ -1184,8 +966,9 @@ export class SoundOfChangeEngine {
     const btnSound = document.getElementById('soc-btn-sound');
     const labelEl = document.getElementById('soc-sound-label');
     const iconEl = document.getElementById('soc-sound-icon');
-    if (btnSound) btnSound.classList.add('playing');
-    if (labelEl) labelEl.textContent = 'Pause Soundscape';
+    btnSound?.setAttribute('aria-pressed', 'true');
+    this.syncSpectrum();
+    if (labelEl) labelEl.textContent = 'Pause';
     if (iconEl) {
       iconEl.innerHTML = `
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -1215,8 +998,9 @@ export class SoundOfChangeEngine {
     const btnSound = document.getElementById('soc-btn-sound');
     const labelEl = document.getElementById('soc-sound-label');
     const iconEl = document.getElementById('soc-sound-icon');
-    if (btnSound) btnSound.classList.remove('playing');
-    if (labelEl) labelEl.textContent = 'Start Soundscape';
+    btnSound?.setAttribute('aria-pressed', 'false');
+    this.syncSpectrum();
+    if (labelEl) labelEl.textContent = 'Listen';
     if (iconEl) {
       iconEl.innerHTML = `
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -1242,10 +1026,20 @@ export class SoundOfChangeEngine {
   }
 
   stop() {
-    this.pauseAudio();
+    this.leave();
+    this.spectrumObserver?.disconnect();
+    if (this.onVisibility) document.removeEventListener('visibilitychange', this.onVisibility);
     if (this.hornTimer) {
       clearInterval(this.hornTimer);
       this.hornTimer = null;
+    }
+    if (this.cavaRafId) {
+      cancelAnimationFrame(this.cavaRafId);
+      this.cavaRafId = null;
+    }
+    if (this.cavaResizeObserver) {
+      this.cavaResizeObserver.disconnect();
+      this.cavaResizeObserver = null;
     }
   }
 }

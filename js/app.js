@@ -18,8 +18,6 @@ import {
 } from './data.js';
 import { SoundEngine } from './audio.js';
 import { SearchController } from './search.js';
-import { SoundOfChangeEngine } from './sound-of-change.js';
-import { ArcadeHub } from './arcade/arcade-hub.js';
 import { arcadeTokens } from './arcade/arcade-tokens.js';
 import { initCalmUI } from './ui.js';
 
@@ -1084,7 +1082,7 @@ class App {
       <div class="leaderboard-soc-banner" id="leaderboard-soc-banner" style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(52, 211, 153, 0.15)); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer;">
         <div>
           <div style="font-weight: 750; color: var(--text-main); font-size: 13px;">🏙️ Explore The Sound of Change (Manhattan)</div>
-          <div style="font-size: 11px; color: var(--text-sub); margin-top: 2px;">Interactive video simulator: Test 20 urban policies & watch the city quiet down.</div>
+          <div style="font-size: 11px; color: var(--text-sub); margin-top: 2px;">Hear how 20 planning decisions change a Manhattan street.</div>
         </div>
         <button class="soc-btn soc-btn-primary" style="white-space: nowrap; font-size: 11.5px; padding: 6px 12px;">Simulate →</button>
       </div>
@@ -1326,7 +1324,7 @@ class App {
     });
 
     window.addEventListener('keydown', (e) => {
-      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || document.querySelector('dialog[open]')) return;
       if (e.key === '/' && this.currentView === 'rain' && !this.isZenMode && document.activeElement !== searchInput) {
         e.preventDefault();
         explore.open = true;
@@ -1348,8 +1346,8 @@ class App {
           this.togglePlayback();
         }
       } else if ((e.key === 'c' || e.key === 'C') && document.activeElement !== searchInput) {
-        if (this.currentView === 'arcade') {
-          // Rainway uses 'C' for camera toggle
+        if (this.currentView === 'arcade' && this.arcade?.activeGameInstance) {
+          // In-game arcade controls take priority
           return;
         }
         this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');
@@ -1504,6 +1502,45 @@ class App {
       });
     }
 
+    // Granular Ambience Dropdown toggle & sub-sliders
+    const ambienceDropdownBtn = document.getElementById('btn-ambience-dropdown');
+    const ambienceDropdownMenu = document.getElementById('ambience-dropdown-menu');
+
+    if (ambienceDropdownBtn && ambienceDropdownMenu) {
+      ambienceDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = ambienceDropdownMenu.classList.toggle('open');
+        ambienceDropdownBtn.classList.toggle('open', isOpen);
+        ambienceDropdownBtn.setAttribute('aria-expanded', String(isOpen));
+      });
+    }
+
+    // Bind all 7 Granular Ambience sub-sliders & live percentage readouts
+    const granularConfigs = [
+      { sliderId: 'slider-wind-vol', valId: 'val-wind-vol', setter: (v) => this.sound.setWindVolume(v) },
+      { sliderId: 'slider-habitat-vol', valId: 'val-habitat-vol', setter: (v) => this.sound.setHabitatVolume(v) },
+      { sliderId: 'slider-traffic-vol', valId: 'val-traffic-vol', setter: (v) => this.sound.setTrafficVolume(v) },
+      { sliderId: 'slider-horns-vol', valId: 'val-horns-vol', setter: (v) => this.sound.setHornsVolume(v) },
+      { sliderId: 'slider-animals-vol', valId: 'val-animals-vol', setter: (v) => this.sound.setAnimalsVolume(v) },
+      { sliderId: 'slider-birds-vol', valId: 'val-birds-vol', setter: (v) => this.sound.setBirdsVolume(v) },
+      { sliderId: 'slider-voices-vol', valId: 'val-voices-vol', setter: (v) => this.sound.setVoicesVolume(v) }
+    ];
+
+    granularConfigs.forEach(({ sliderId, valId, setter }) => {
+      const slider = document.getElementById(sliderId);
+      const valEl = document.getElementById(valId);
+      if (slider) {
+        slider.addEventListener('input', (e) => {
+          const val = parseFloat(e.target.value);
+          setter(val);
+          if (valEl) {
+            valEl.textContent = val <= 0.005 ? 'OFF' : `${Math.round(val * 100)}%`;
+            valEl.classList.toggle('is-off', val <= 0.005);
+          }
+        });
+      }
+    });
+
     if (lofiSlider) {
       lofiSlider.addEventListener('input', (e) => {
         this.sound.setLoFiVolume(parseFloat(e.target.value));
@@ -1623,9 +1660,9 @@ class App {
       this.switchExperience('arcade');
     });
     brand?.addEventListener('click', () => this.switchExperience('rain'));
-    document.getElementById('btn-token-shop').addEventListener('click', () => {
-      this.switchExperience('arcade');
-      this.arcade.openShop();
+    document.getElementById('btn-token-shop').addEventListener('click', async () => {
+      await this.switchExperience('arcade');
+      if (this.currentView === 'arcade') this.arcade?.openShop();
     });
     const updateWallet = () => {
       document.getElementById('hud-token-count').textContent = arcadeTokens.profile.tokens + ' tokens';
@@ -1652,13 +1689,13 @@ class App {
     handleHash();
   }
 
-  switchExperience(viewName, updateHash = true) {
+  async switchExperience(viewName, updateHash = true) {
     if (this.currentView === viewName && !updateHash) return;
     if (this.isZenMode) this.toggleUiVisibility();
     this.readout.open = false;
     this.hideCursorTracker();
-    if (this.currentView === 'sound-of-change' && viewName !== 'sound-of-change') this.soundOfChange.leave();
-    if (this.currentView === 'arcade' && viewName !== 'arcade') this.arcade.closeActiveGame();
+    if (this.currentView === 'sound-of-change' && viewName !== 'sound-of-change') this.soundOfChange?.leave();
+    if (this.currentView === 'arcade' && viewName !== 'arcade') this.arcade?.leave();
     this.currentView = viewName;
     document.body.dataset.experience = viewName;
     document.getElementById('map').inert = viewName !== 'rain';
@@ -1676,26 +1713,43 @@ class App {
     socView.classList.toggle('active', viewName === 'sound-of-change');
     arcadeView.classList.toggle('active', viewName === 'arcade');
 
+    if (updateHash) window.history.replaceState(null, '', '#' + viewName);
     if (viewName === 'rain') {
       if (this.isListening && this.listeningTarget) {
         this.sound.updateRain(this.listeningTarget.rate, this.map.getZoom(), true);
         this.sound.updateAmbience(this.currentEnv, true);
       }
-    } else {
-      if (!this.sound.ctx) this.sound.init();
-      if (this.isListening) this.sound.updateRain(0, this.sound.currentZoom, false);
-      if (viewName === 'sound-of-change') {
-        if (this.soundOfChange) {
-          this.soundOfChange.initVideo();
-        } else {
-          this.soundOfChange = new SoundOfChangeEngine(this.sound.ctx);
-          this.soundOfChange.mount(socView, this.sound.ctx);
-        }
-      } else if (!this.arcade) {
-        this.arcade = new ArcadeHub(arcadeView, this.sound.ctx);
-      }
+      return;
     }
-    if (updateHash) window.history.replaceState(null, '', '#' + viewName);
+    if (this.isListening) {
+      this.sound.updateRain(0, this.sound.currentZoom, false);
+      this.sound.updateAmbience(this.currentEnv, false);
+    }
+
+    const panel = viewName === 'arcade' ? arcadeView : socView;
+    try {
+      if (viewName === 'arcade' && !this.arcade) {
+        const { ArcadeHub } = await import('./arcade/arcade-hub.js');
+        if (this.currentView === viewName) this.arcade ??= new ArcadeHub(panel, this.sound.ctx);
+      } else if (viewName === 'sound-of-change') {
+        const { SoundOfChangeEngine } = await import('./sound-of-change.js');
+        if (this.currentView !== viewName) return;
+        if (this.soundOfChange) this.soundOfChange.enter();
+        else {
+          const engine = new SoundOfChangeEngine(this.sound.ctx);
+          engine.mount(panel, this.sound.ctx);
+          this.soundOfChange = engine;
+        }
+      }
+    } catch (error) {
+      console.error('Could not open the experience', error);
+      if (this.currentView !== viewName) return;
+      const retry = document.createElement('button');
+      retry.className = 'experience-retry';
+      retry.textContent = 'Could not load this experience. Retry';
+      retry.onclick = () => this.switchExperience(viewName);
+      panel.replaceChildren(retry);
+    }
   }
 
   initMobileUI() {

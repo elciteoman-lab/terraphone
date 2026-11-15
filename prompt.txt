@@ -1,15 +1,9 @@
-Terraphone · NASA Space Apps Challenge 2026
+Terraphone · NASA Space Apps
 
-Work in this repository on the requested change. Keep Global Rain, Sound of Change, Earth Arcade, existing routes, data and controls working. Inspect the relevant implementation and reuse its components first. The unabridged project specification is in docs/sound-of-change-brief.md. For work that depends on a section, read it in full.
+Follow the current upstream implementation and the requested change. Keep the globe, NASA credit, Explore menu, hash routes, wallet and existing saves. Preserve touch, keyboard and reduced-motion support. The first-visit intro must never delay input.
 
-Global Rain / interface
-Keep the interactive globe, location search, rain sonification, city noise profiles and NASA GPM IMERG attribution. Distinguish unavailable rain data from zero rainfall. Keep the NASA credit at bottom left and Explore at top right. Use the globe as the focal point. Put secondary controls in Explore or in contextual panels. Support touch, keyboard, small screens and reduced motion.
+Global Rain uses NASA GPM IMERG, location search, a WebGL or Canvas globe and a seven-layer ambience mixer. Distinguish missing rain data from zero rainfall.
 
-Sound of Change
-Show a noisy Manhattan street using supplied Google Flow footage. Keep separate muted noisy/quiet videos with matching framing, responsive sizing and poster fallbacks. A visitor can compare before and after, select the listening perspective, apply all or reset. Use real controls, a shared state and immediate synchronized visual, acoustic and index updates. Sections 3–5 and 8–11 describe the complete intervention list, visual effects, assets and navigation.
+Sound of Change uses a Manhattan still, a real 64-band FFT and six Web Audio channels. Preserve all 20 interventions, logarithmic energy summation, indoor/outdoor perspectives, baseline comparison, master volume and the simulated 0–100 noise index. Run the spectrum only while playback is active and visible. The historical brief in docs/sound-of-change-brief.md provides intervention and acoustic-model detail.
 
-Acoustics and science
-Use Web Audio gain controls for traffic (including engines and horns), construction, industry, crowds and nature. Start sound on user interaction. Preserve master volume, mute, smooth transitions and cleanup. Show the source-based 0–100 “Simulated Noise Index”. Distinguish it from measured decibels and reported complaints. Sum acoustic energy logarithmically, avoid counting overlapping interventions twice, and distinguish indoor insulation from outdoor exposure. Hearing-health education alone does not reduce ambient noise. Sections 6–7 give the full model and audio requirements.
-
-Delivery
-Complete the requested change, check affected interactions and preserve data and media fidelity. For verification, presentation or a full implementation, use the acceptance criteria and priorities in sections 12–15. Report what changed, how to run or view it, and any missing assets or verification limits.
+Earth Arcade has six games. Preserve their controls, briefings, scores and cosmetics. Use static covers and native scrolling for selection. Test relevant routes and interactions.

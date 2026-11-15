@@ -9,9 +9,10 @@ import assert from 'assert';
 // SETUP MOCK DOM AND WEB AUDIO GLOBALS BEFORE DYNAMIC IMPORTS
 // -------------------------------------------------------------
 let storageData = {};
+let storageWrites = 0;
 global.localStorage = {
   getItem: (k) => storageData[k] || null,
-  setItem: (k, v) => { storageData[k] = String(v); },
+  setItem: (k, v) => { storageData[k] = String(v); storageWrites++; },
   removeItem: (k) => { delete storageData[k]; },
   clear: () => { storageData = {}; }
 };
@@ -40,6 +41,11 @@ class MockCanvasContext {
   strokeRect() {}
   clearRect() {}
   fillText() {}
+  measureText(text) { return { width: text.length * 7 }; }
+  bezierCurveTo() {}
+  quadraticCurveTo() {}
+  setLineDash() {}
+  drawImage() {}
   save() {}
   restore() {}
   translate() {}
@@ -59,6 +65,9 @@ class MockCanvas {
     this.height = height;
     this._ctx = new MockCanvasContext();
   }
+  addEventListener() {}
+  removeEventListener() {}
+  focus() {}
   getContext(type) {
     return this._ctx;
   }
@@ -153,6 +162,7 @@ global.document = {
       },
       addEventListener() {},
       removeEventListener() {},
+      focus() {},
       querySelector() { return null; },
       querySelectorAll() { return []; }
     };
@@ -168,11 +178,9 @@ async function runArcadeTests() {
 
   // Dynamic import of modules after mock setup
   const { arcadeTokens, COSMETICS_CATALOG } = await import('../js/arcade/arcade-tokens.js');
-  const { RainwayGame } = await import('../js/arcade/rainway.js');
   const { FirelineGame } = await import('../js/arcade/fireline.js');
   const {
     HeatEscapeGame,
-    WaterKeeperGame,
     CloudCourierGame,
     OzoneDriftGame,
     CoralCurrentGame,
@@ -201,66 +209,33 @@ async function runArcadeTests() {
   const defaultPaint = arcadeTokens.getEquippedSkin('carPaint');
   assert.strictEqual(defaultPaint, '#38bdf8', 'Default car paint should be Skyline Cyan');
 
-  // Unlock Obsidian paint (cost 10)
-  const unlockOk = arcadeTokens.unlockCosmetic('carPaints', 'obsidian', 10);
-  assert.strictEqual(unlockOk, true, 'Unlocking obsidian paint should succeed');
-  assert.strictEqual(arcadeTokens.profile.tokens, 10, 'Tokens should decrease from 20 to 10');
-  arcadeTokens.equipCosmetic('carPaint', 'obsidian');
-  assert.strictEqual(arcadeTokens.getEquippedSkin('carPaint'), '#0f172a', 'Equipped paint should now be Obsidian Midnight');
+  const crown = COSMETICS_CATALOG.crowns.find(item => item.id === 'golden_crown');
+  assert.equal(crown.cost, 20000);
+  assert.equal(arcadeTokens.unlockCosmetic('crowns', crown.id, crown.cost), false);
+  arcadeTokens.addTokens(20000);
+  assert.equal(arcadeTokens.unlockCosmetic('crowns', crown.id, crown.cost), true);
+  assert.equal(arcadeTokens.profile.tokens, 20);
+  arcadeTokens.equipCosmetic('crown', crown.id);
+  assert.equal(arcadeTokens.getEquippedSkin('crown'), crown.hex);
 
   // Test High Score Recording
-  const result = arcadeTokens.recordHighScore('rainway', 1420, 'km');
+  const beforeRecord = storageWrites;
+  const result = arcadeTokens.recordHighScore('heat_escape', 1420, 'm');
   assert.strictEqual(result.isNewBest, true, 'First high score record should be true');
-  assert.strictEqual(arcadeTokens.profile.highScores.rainway.score, 1420);
+  assert.strictEqual(arcadeTokens.profile.highScores.heat_escape.score, 1420);
+  assert.equal(storageWrites, beforeRecord + 1, 'Record and wallet should be saved together');
+  assert.deepEqual(arcadeTokens.recordHighScore('heat_escape', 1420, 'm'), { isNewBest: false, best: 1420 });
+  assert.equal(storageWrites, beforeRecord + 1, 'A repeated score must not write each frame');
 
   console.log('✅ Token Economy & Cosmetics Catalog verified!\n');
 
   // -------------------------------------------------------------
-  // TEST 2: Rainway (Endless 3D Driving Game)
-  // -------------------------------------------------------------
-  console.log('--- TEST 2: Rainway (Procedural 3D Driving Engine) ---');
   const mockCanvas = new MockCanvas();
   const mockAudio = new MockAudioContext();
-  let exitedRainway = false;
 
-  const rainway = new RainwayGame(mockCanvas, mockAudio, () => { exitedRainway = true; });
-  assert.strictEqual(rainway.segments.length > 500, true, 'Rainway should generate procedural road segments');
-  assert.strictEqual(rainway.cloudRings.length >= 3, true, 'Rainway should place secret cloud glider rings');
-
-  rainway.start();
-  assert.strictEqual(rainway.isRunning, true, 'Rainway should be running');
-
-  // Simulate Driving Physics
-  rainway.keys.up = true;
-  rainway.update(0.1);
-  assert.strictEqual(rainway.speed > 0, true, 'Vehicle should accelerate forward');
-
-  // Test Autopilot
-  rainway.toggleAutopilot();
-  assert.strictEqual(rainway.isAutopilot, true, 'Autopilot should toggle on');
-  for (let s = 0; s < 15; s++) {
-    rainway.update(0.1);
-  }
-  assert.strictEqual(rainway.speed > 20, true, 'Autopilot should maintain cruising speed');
-
-  // Test Cloud Glider Transformation
-  rainway.triggerGliderMode();
-  assert.strictEqual(rainway.isGliderMode, true, 'Cloud Glider flight mode should activate');
-  assert.strictEqual(rainway.cameraMode, 'glider', 'Camera should switch to glider view');
-
-  rainway.pause();
-  assert.strictEqual(rainway.isPaused, true, 'Rainway should pause');
-  rainway.resume();
-  assert.strictEqual(rainway.isPaused, false, 'Rainway should resume');
-
-  rainway.stop();
-  assert.strictEqual(rainway.isRunning, false, 'Rainway should stop cleanly');
-  console.log('✅ Rainway 3D driving & Cloud Glider verified!\n');
-
+  // TEST 2: Fireline (2.5D Isometric Forest Exploration)
   // -------------------------------------------------------------
-  // TEST 3: Fireline (2.5D Isometric Forest Exploration)
-  // -------------------------------------------------------------
-  console.log('--- TEST 3: Fireline (2.5D Isometric Forest Engine) ---');
+  console.log('--- TEST 2: Fireline (2.5D Isometric Forest Engine) ---');
   let exitedFireline = false;
   const fireline = new FirelineGame(mockCanvas, mockAudio, () => { exitedFireline = true; });
 
@@ -287,42 +262,35 @@ async function runArcadeTests() {
   console.log('✅ Fireline isometric forest & Golden Firefly verified!\n');
 
   // -------------------------------------------------------------
-  // TEST 4: Six Environmental Mini Games
+  // TEST 3: Five Environmental Mini Games
   // -------------------------------------------------------------
-  console.log('--- TEST 4: Six Environmental Exploration Mini-Games ---');
+  console.log('--- TEST 3: Five Environmental Exploration Mini-Games ---');
 
-  // 03. Heat Escape
+  // 02. Heat Escape
   const heat = new HeatEscapeGame(mockCanvas, mockAudio, () => {});
   heat.start();
-  heat.keys.up = true;
-  heat.update(0.1);
-  assert.strictEqual(heat.cityAvenues.length > 20, true, 'Heat Escape should have ECOSTRESS city blocks');
+  assert.equal(heat.numLanes, 5);
+  heat.changeLane(1);
+  assert.equal(heat.targetLane, 3);
+  heat.jump();
+  heat.update(0.016);
+  assert.ok(heat.player.isJumping && heat.player.distance > 0);
   heat.pause();
   assert.strictEqual(heat.isPaused, true, 'Heat Escape should pause');
   heat.stop();
-  console.log('  ✓ 03. Heat Escape (NASA ECOSTRESS LST) verified');
+  console.log('  ✓ 02. Heat Escape (NASA ECOSTRESS LST) verified');
 
-  // 04. Water Keeper
-  const water = new WaterKeeperGame(mockCanvas, mockAudio, () => {});
-  water.start();
-  water.update(0.1);
-  assert.strictEqual(water.getTerrainAt(200).y > 0, true, 'Water Keeper should have SMAP soil moisture terrain');
-  water.pause();
-  assert.strictEqual(water.isPaused, true, 'Water Keeper should pause');
-  water.stop();
-  console.log('  ✓ 04. Water Keeper (NASA SMAP Soil Moisture) verified');
-
-  // 05. Cloud Courier
+  // 03. Cloud Courier
   const cloud = new CloudCourierGame(mockCanvas, mockAudio, () => {});
   cloud.start();
   cloud.update(0.016);
-  assert.strictEqual(cloud.smokestackGates.length > 10, true, 'Cloud Courier should have OMI SO2/NO2 plumes');
+  assert.equal(cloud.smokestackGates.length, 8, 'Cloud Courier should maintain eight gates ahead');
   cloud.pause();
   assert.strictEqual(cloud.isPaused, true, 'Cloud Courier should pause');
   cloud.stop();
-  console.log('  ✓ 05. Cloud Courier (NASA OMI & GPM) verified');
+  console.log('  ✓ 03. Cloud Courier (NASA OMI & GPM) verified');
 
-  // 06. Ozone Drift
+  // 04. Ozone Drift
   const ozone = new OzoneDriftGame(mockCanvas, mockAudio, () => {});
   ozone.start();
   ozone.update(0.016);
@@ -330,9 +298,9 @@ async function runArcadeTests() {
   ozone.pause();
   assert.strictEqual(ozone.isPaused, true, 'Ozone Drift should pause');
   ozone.stop();
-  console.log('  ✓ 06. Ozone Drift (NASA Ozone Watch / Aura OMI) verified');
+  console.log('  ✓ 04. Ozone Drift (NASA Ozone Watch / Aura OMI) verified');
 
-  // 07. Coral Current
+  // 05. Coral Current
   const coral = new CoralCurrentGame(mockCanvas, mockAudio, () => {});
   coral.start();
   coral.update(0.016);
@@ -340,9 +308,9 @@ async function runArcadeTests() {
   coral.pause();
   assert.strictEqual(coral.isPaused, true, 'Coral Current should pause');
   coral.stop();
-  console.log('  ✓ 07. Coral Current (NOAA Coral Reef Watch) verified');
+  console.log('  ✓ 05. Coral Current (NOAA Coral Reef Watch) verified');
 
-  // 08. Last Forest
+  // 06. Last Forest
   const forest = new LastForestGame(mockCanvas, mockAudio, () => {});
   forest.start();
   forest.update(0.016);
@@ -350,32 +318,27 @@ async function runArcadeTests() {
   forest.pause();
   assert.strictEqual(forest.isPaused, true, 'Last Forest should pause');
   forest.stop();
-  console.log('  ✓ 08. Last Forest (NASA / USGS Landsat Canopy) verified');
+  console.log('  ✓ 06. Last Forest (NASA / USGS Landsat Canopy) verified');
 
   // -------------------------------------------------------------
-  // TEST 5: ArcadeHub Coordination & Game Launching
+  // TEST 4: ArcadeHub Coordination & Game Launching
   // -------------------------------------------------------------
-  console.log('\n--- TEST 5: ArcadeHub Lifecycle & Game Orchestration ---');
-  assert.strictEqual(ARCADE_GAMES.length, 8, 'Earth Arcade must feature all 8 games');
+  console.log('\n--- TEST 4: ArcadeHub Lifecycle & Game Orchestration ---');
+  assert.deepEqual(ARCADE_GAMES.map(game => game.id), ['fireline', 'heat_escape', 'cloud_courier', 'ozone_drift', 'coral_current', 'last_forest']);
 
-  const mockContainer = {
-    innerHTML: '',
-    querySelector: () => null,
-    querySelectorAll: () => [],
-    addEventListener: () => {}
-  };
-
+  const mockContainer = document.createElement('main');
+  mockContainer.querySelector = () => document.createElement('div');
   const hub = new ArcadeHub(mockContainer, mockAudio);
   assert.strictEqual(hub.activeGameInstance, null, 'Hub should start with no active game');
 
-  // Test launching a mini-game
-  hub.launchGame('rainway');
-  assert.notStrictEqual(hub.activeGameInstance, null, 'Active game instance should be running Rainway');
-  assert.strictEqual(hub.activeGameId, 'rainway');
-
-  hub.closeActiveGame();
-  assert.strictEqual(hub.activeGameInstance, null, 'Active game should be cleaned up on close');
-  assert.strictEqual(hub.activeGameId, null);
+  for (const { id } of ARCADE_GAMES) {
+    hub.launchGame(id);
+    assert.equal(hub.activeGameId, id);
+    assert.ok(hub.activeGameInstance.isRunning, id + ' should run');
+    hub.closeActiveGame();
+    assert.equal(hub.activeGameInstance, null);
+    assert.equal(hub.activeGameId, null);
+  }
 
   console.log('✅ ArcadeHub coordination verified!\n');
 
