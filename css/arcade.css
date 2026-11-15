@@ -425,6 +425,7 @@
 }
 
 .arcade-game-banner {
+  display: none !important; /* Hidden in-game to keep milestones and achievement banners unobstructed */
   pointer-events: none;
   background: rgba(10, 15, 26, 0.88);
   backdrop-filter: blur(14px);
@@ -434,7 +435,6 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--text-main);
-  display: flex;
   align-items: center;
   gap: 7px;
 }
@@ -678,52 +678,67 @@
 
 .shop-items-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
 }
 
 .shop-item {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
-  padding: 10px;
+  padding: 12px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .shop-item:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.shop-item[data-cost="20000"] {
+  border-color: rgba(255, 215, 0, 0.45);
+  background: linear-gradient(180deg, rgba(255, 215, 0, 0.09) 0%, rgba(255, 255, 255, 0.03) 100%);
+}
+
+.shop-item[data-cost="20000"]:hover {
+  border-color: #ffd700;
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.35);
 }
 
 .shop-item.equipped {
-  border-color: #10b981;
-  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.12) !important;
 }
 
 .color-swatch {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.25);
 }
 
 .shop-item-name {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-main);
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.25;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .shop-item-cost {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  color: #38bdf8;
+  color: #E7F434;
 }
 
 .shop-item.equipped .shop-item-cost {

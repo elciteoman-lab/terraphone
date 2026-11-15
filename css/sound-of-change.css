@@ -190,7 +190,7 @@
 
 .soc-cava-canvas-wrap {
   width: 100%;
-  height: 84px;
+  height: 165px;
   position: relative;
   background: rgba(12, 14, 24, 0.55);
   border-radius: 12px;
@@ -225,13 +225,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 22px;
   background: var(--panel-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-card);
-  padding: 10px 18px;
+  padding: 12px 24px;
   box-shadow: var(--shadow-hud);
   flex-shrink: 0;
 }
@@ -302,17 +302,23 @@
   overflow: hidden;
 }
 
-/* Simulated Noise Index Capsule */
+/* Simulated Noise Index Capsule — Spacious & High Contrast */
 .soc-index-capsule {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid var(--panel-border);
-  border-radius: 14px;
-  padding: 8px 18px;
-  min-width: 250px;
-  flex-shrink: 0;
+  background: rgba(12, 14, 24, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 12px 24px;
+  min-width: 420px;
+  max-width: 540px;
+  flex: 1 1 420px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: var(--trans-smooth);
+}
+
+.soc-index-capsule:hover {
+  border-color: rgba(231, 244, 52, 0.35);
 }
 
 .soc-index-top {
@@ -321,92 +327,105 @@
   justify-content: space-between;
   width: 100%;
   gap: 12px;
+  margin-bottom: 4px;
   white-space: nowrap;
 }
 
 .soc-index-title {
-  font-size: 9.5px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 800;
   letter-spacing: 0.08em;
   color: var(--text-muted);
-  white-space: nowrap;
+  text-transform: uppercase;
 }
 
 .soc-index-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 6px;
-  letter-spacing: 0.04em;
+  font-size: 10.5px;
+  font-weight: 750;
+  padding: 2.5px 10px;
+  border-radius: var(--radius-pill);
+  letter-spacing: 0.05em;
   white-space: nowrap;
 }
 
 .soc-index-badge.high {
-  background: rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.22);
   color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  border: 1px solid rgba(239, 68, 68, 0.45);
 }
 
 .soc-index-badge.moderate {
-  background: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.22);
   color: #fbbf24;
-  border: 1px solid rgba(245, 158, 11, 0.4);
+  border: 1px solid rgba(245, 158, 11, 0.45);
 }
 
 .soc-index-badge.good {
-  background: rgba(52, 211, 153, 0.2);
+  background: rgba(52, 211, 153, 0.22);
   color: #34d399;
-  border: 1px solid rgba(52, 211, 153, 0.4);
+  border: 1px solid rgba(52, 211, 153, 0.45);
 }
 
 .soc-index-badge.tranquil {
-  background: rgba(56, 189, 248, 0.2);
+  background: rgba(56, 189, 248, 0.22);
   color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.4);
+  border: 1px solid rgba(56, 189, 248, 0.45);
 }
 
 .soc-index-main {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 4px 0 8px 0;
+}
+
+.soc-index-score-box {
+  display: flex;
   align-items: baseline;
-  gap: 6px;
-  margin: 2px 0;
+  gap: 4px;
   white-space: nowrap;
 }
 
 .soc-index-num {
-  font-size: 38px;
+  font-size: 42px;
   font-weight: 850;
   line-height: 1;
   color: var(--text-main);
   font-variant-numeric: tabular-nums;
   transition: color 0.3s ease;
-  white-space: nowrap;
 }
 
 .soc-index-scale {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-muted);
-  white-space: nowrap;
+}
+
+.soc-index-divider {
+  width: 1px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .soc-index-metrics {
   display: flex;
   flex-direction: column;
-  margin-left: 8px;
-  line-height: 1.2;
-  white-space: nowrap;
+  justify-content: center;
+  gap: 3px;
+  text-align: right;
+  line-height: 1.25;
 }
 
 .soc-metric-db {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-sub);
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
   white-space: nowrap;
 }
 
 .soc-metric-diff {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
@@ -415,11 +434,11 @@
 .soc-index-bar {
   position: relative;
   width: 100%;
-  height: 6px;
+  height: 8px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-pill);
   overflow: visible;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
 .soc-index-bar-fill {

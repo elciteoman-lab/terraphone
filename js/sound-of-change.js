@@ -120,15 +120,18 @@ export class SoundOfChangeEngine {
           <!-- Prominent Simulated Noise Index Capsule -->
           <div class="soc-index-capsule" id="soc-index-capsule">
             <div class="soc-index-top">
-              <span class="soc-index-title">SIMULATED NOISE INDEX</span>
+              <span class="soc-index-title">SIMULATED NOISE INDEX · NASA S2L BIOACOUSTICS</span>
               <span class="soc-index-badge" id="soc-index-badge">HIGH NOISE</span>
             </div>
             <div class="soc-index-main">
-              <span class="soc-index-num" id="soc-index-num">${this.city.initialIndex}</span>
-              <span class="soc-index-scale">/ 100</span>
+              <div class="soc-index-score-box">
+                <span class="soc-index-num" id="soc-index-num">${this.city.initialIndex}</span>
+                <span class="soc-index-scale">/ 100</span>
+              </div>
+              <div class="soc-index-divider"></div>
               <div class="soc-index-metrics">
-                <span class="soc-metric-db" id="soc-metric-db">~85 dBA equiv</span>
-                <span class="soc-metric-diff" id="soc-metric-diff">Baseline Level</span>
+                <span class="soc-metric-db" id="soc-metric-db">~85 dBA equiv (High Noise)</span>
+                <span class="soc-metric-diff" id="soc-metric-diff">Baseline Manhattan Level</span>
               </div>
             </div>
             <div class="soc-index-bar">
@@ -270,7 +273,7 @@ export class SoundOfChangeEngine {
             </div>
           </div>
           <div class="soc-cava-canvas-wrap">
-            <canvas id="soc-cava-canvas" class="soc-cava-canvas" height="84"></canvas>
+            <canvas id="soc-cava-canvas" class="soc-cava-canvas" height="165"></canvas>
           </div>
         </div>
 
@@ -839,8 +842,8 @@ export class SoundOfChangeEngine {
     // Connect audio analyser if AudioContext and masterGain are ready
     if (this.audioCtx && this.masterGain && !this.analyser) {
       this.analyser = this.audioCtx.createAnalyser();
-      this.analyser.fftSize = 256;
-      this.analyser.smoothingTimeConstant = 0.65;
+      this.analyser.fftSize = 512;
+      this.analyser.smoothingTimeConstant = 0.40;
       this.masterGain.connect(this.analyser);
       this.cavaDataArray = new Uint8Array(this.analyser.frequencyBinCount);
     }
@@ -888,62 +891,66 @@ export class SoundOfChangeEngine {
     // Clear frame
     ctx.clearRect(0, 0, w, h);
 
-    const isLive = this.isPlaying && this.analyser && this.cavaDataArray;
-    if (isLive) {
+    // Check if live audio is actively playing through the Web Audio graph
+    let hasRealAudio = false;
+    if (this.analyser && this.cavaDataArray) {
       this.analyser.getByteFrequencyData(this.cavaDataArray);
+      let sampleSum = 0;
+      for (let k = 0; k < Math.min(80, this.cavaDataArray.length); k++) {
+        sampleSum += this.cavaDataArray[k];
+      }
+      hasRealAudio = this.isPlaying && (sampleSum > 12);
     }
 
     const barCount = this.cavaBars; // 64 bars
-    const binCount = this.cavaDataArray ? this.cavaDataArray.length : 128; // 128 bins
+    const binCount = this.cavaDataArray ? this.cavaDataArray.length : 256;
 
-    // Update CAVA physics for all 64 frequency bars
+    // Update real CAVA spectrum physics for all 64 frequency bars
     for (let i = 0; i < barCount; i++) {
       let rawVal = 0;
 
-      if (isLive) {
-        // Logarithmic frequency bin distribution across the audible spectrum (20Hz - 16kHz)
-        // Humans perceive pitch logarithmically; this gives high resolution to bass/mids
-        const normIdx = i / (barCount - 1);
-        const logMin = Math.log10(1);
-        const logMax = Math.log10(binCount - 1);
-        const logBin = Math.pow(10, logMin + normIdx * (logMax - logMin));
-        const lowBin = Math.max(0, Math.min(binCount - 1, Math.floor(logBin)));
-        const highBin = Math.max(0, Math.min(binCount - 1, Math.ceil(logBin)));
-        const frac = logBin - lowBin;
+      if (hasRealAudio) {
+        // Logarithmic/Mel frequency distribution across audible urban spectrum (30Hz - 8kHz)
+        // Gives high resolution to sub-bass/traffic rumble, midrange horns, and high nature chirps
+        const t = i / (barCount - 1);
+        const binStart = Math.max(1, Math.floor(Math.pow(t, 1.7) * 140));
+        const binEnd = Math.min(binCount - 1, Math.max(binStart + 1, Math.floor(Math.pow((i + 1) / barCount, 1.7) * 140)));
 
-        const sample = (this.cavaDataArray[lowBin] * (1 - frac) + this.cavaDataArray[highBin] * frac) / 255;
-        // Equal loudness curve compensation: mild boost for higher frequencies
-        const eqBoost = 1.0 + normIdx * 0.85;
-        rawVal = Math.min(1.0, sample * eqBoost);
+        let bandSum = 0;
+        let count = 0;
+        for (let b = binStart; b <= binEnd; b++) {
+          bandSum += this.cavaDataArray[b];
+          count++;
+        }
+        const bandAvg = (bandSum / Math.max(1, count)) / 255.0;
+
+        // Equal loudness curve compensation: boosts higher frequencies so visualizer is energetic & full
+        const eqBoost = 1.0 + Math.pow(t, 0.72) * 1.5;
+        rawVal = Math.min(1.0, bandAvg * eqBoost * 1.38);
       } else {
-        // Ambient breathing motion wave when soundscape is idle
-        const wave1 = Math.sin(time * 0.0022 + i * 0.16) * 0.07;
-        const wave2 = Math.cos(time * 0.0035 - i * 0.11) * 0.04;
-        const baseline = 0.04 + Math.sin(i * 0.09) * 0.02;
-        rawVal = Math.max(0.015, baseline + wave1 + wave2);
+        // Authentic audio hardware noise floor (micro-jitter, NEVER smooth mathematical waves!)
+        rawVal = 0.012 + (Math.random() * 0.008);
       }
 
-      // Fast attack vs smooth gravity decay
+      // Fast explosive attack on transients (snappy, jumpy, real audio)
       if (rawVal > this.cavaBarValues[i]) {
-        // Instant attack for live punchy dynamics
-        this.cavaBarValues[i] = this.cavaBarValues[i] * 0.25 + rawVal * 0.75;
+        this.cavaBarValues[i] = this.cavaBarValues[i] * 0.12 + rawVal * 0.88;
       } else {
-        // Gravity falloff
-        const falloffSpeed = 1.75; // falloff rate per second
-        this.cavaBarValues[i] = Math.max(0, this.cavaBarValues[i] - falloffSpeed * dt);
+        // Fast gravity falloff (3.2 per second)
+        this.cavaBarValues[i] = Math.max(0.01, this.cavaBarValues[i] - 3.2 * dt);
       }
 
       // Floating Peak Cap Physics (Signature CAVA terminal feature)
       if (this.cavaBarValues[i] >= this.cavaPeakValues[i]) {
         this.cavaPeakValues[i] = this.cavaBarValues[i];
-        this.cavaPeakHolds[i] = 12; // Hold frames at peak before accelerating down
+        this.cavaPeakHolds[i] = 7; // Hold frames at peak
         this.cavaPeakVels[i] = 0;
       } else {
         if (this.cavaPeakHolds[i] > 0) {
           this.cavaPeakHolds[i]--;
         } else {
-          this.cavaPeakVels[i] += 4.5 * dt; // Gravity acceleration
-          this.cavaPeakValues[i] = Math.max(0, this.cavaPeakValues[i] - this.cavaPeakVels[i] * dt);
+          this.cavaPeakVels[i] += 5.5 * dt; // Gravity acceleration
+          this.cavaPeakValues[i] = Math.max(0.01, this.cavaPeakValues[i] - this.cavaPeakVels[i] * dt);
         }
       }
     }
@@ -952,7 +959,7 @@ export class SoundOfChangeEngine {
     const gap = Math.max(2 * dpr, Math.floor(w / (barCount * 10)));
     const totalGap = gap * (barCount - 1);
     const barWidth = Math.max(2 * dpr, (w - totalGap) / barCount);
-    const usableHeight = h - 8 * dpr;
+    const usableHeight = h - 10 * dpr;
 
     // Official NASA Space Apps Challenge Vertical Palette Gradient:
     // Deep Space Blue (#1B2B85) -> Sky Blue (#0ea5e9) -> Nature Green (#10b981) -> Fluorescent Yellow (#E7F434)
@@ -1022,11 +1029,11 @@ export class SoundOfChangeEngine {
     this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.masterVolume, now);
     this.masterGain.connect(this.audioCtx.destination);
 
-    // CAVA Spectrum Analyser
+    // CAVA Spectrum Analyser (Real-time FFT audio stream)
     if (!this.analyser) {
       this.analyser = this.audioCtx.createAnalyser();
-      this.analyser.fftSize = 256;
-      this.analyser.smoothingTimeConstant = 0.65;
+      this.analyser.fftSize = 512;
+      this.analyser.smoothingTimeConstant = 0.40;
       this.masterGain.connect(this.analyser);
       this.cavaDataArray = new Uint8Array(this.analyser.frequencyBinCount);
     }

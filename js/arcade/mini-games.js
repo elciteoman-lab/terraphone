@@ -938,6 +938,7 @@ export class HeatEscapeGame {
       const isGold = (equippedSkin?.id === 'golden_crown' || equippedCrown?.id === 'golden_crown');
 
       let deckFill = this.player.hydration > 50 ? '#38bdf8' : (this.player.hydration > 25 ? '#f59e0b' : '#ef4444');
+      const gradColors = equippedSkin?.colors || equippedSkin?.gradient;
       if (isGold) {
         const goldGrad = ctx.createLinearGradient(0, -16, 0, 16);
         goldGrad.addColorStop(0, '#fef08a');
@@ -945,10 +946,10 @@ export class HeatEscapeGame {
         goldGrad.addColorStop(0.7, '#d97706');
         goldGrad.addColorStop(1, '#92400e');
         deckFill = goldGrad;
-      } else if (equippedSkin?.gradient) {
+      } else if (gradColors && gradColors.length) {
         const grad = ctx.createLinearGradient(0, -16, 0, 16);
-        equippedSkin.gradient.forEach((color, idx) => {
-          grad.addColorStop(idx / (equippedSkin.gradient.length - 1), color);
+        gradColors.forEach((color, idx) => {
+          grad.addColorStop(idx / (gradColors.length - 1), color);
         });
         deckFill = grad;
       } else if (equippedSkin?.hex) {
@@ -969,14 +970,16 @@ export class HeatEscapeGame {
       ctx.fill();
 
       // Scooter frame
-      ctx.fillStyle = isGold ? '#78350f' : (equippedSkin?.texture === 'carbon_matrix' ? '#090d16' : '#0f172a');
+      const isCarbon = equippedSkin?.texture === 'carbon_matrix' || equippedSkin?.id === 'carbon_matrix' || equippedSkin?.pattern === 'carbon';
+      const isMagma = equippedSkin?.texture === 'volcanic_magma' || equippedSkin?.id === 'volcanic_magma' || equippedSkin?.pattern === 'magma';
+      ctx.fillStyle = isGold ? '#78350f' : (isCarbon ? '#090d16' : (isMagma ? '#450a0a' : '#0f172a'));
       ctx.fillRect(-5, isSliding ? -6 : -16, 10, isSliding ? 20 : 32);
 
-      // Carbon matrix cyan pinstripe
-      if (equippedSkin?.texture === 'carbon_matrix') {
+      // Carbon matrix cyan pinstripe or Magma flame pinstripe
+      if (isCarbon) {
         ctx.fillStyle = '#06b6d4';
         ctx.fillRect(-1, isSliding ? -6 : -16, 2, isSliding ? 20 : 32);
-      } else if (equippedSkin?.texture === 'volcanic_magma') {
+      } else if (isMagma) {
         ctx.fillStyle = '#f97316';
         ctx.fillRect(-1.5, isSliding ? -6 : -16, 3, isSliding ? 20 : 32);
       }
@@ -1081,6 +1084,26 @@ export class HeatEscapeGame {
         ctx.lineTo(4, -9);
         ctx.lineTo(8, 2);
         ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      } else if (equippedCrown?.id === 'celestial_diadem') {
+        const diademY = isSliding ? -16 : -28;
+        ctx.save();
+        ctx.translate(0, diademY);
+        ctx.fillStyle = '#e0f2fe';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 14;
+        ctx.beginPath();
+        ctx.moveTo(-9, 1);
+        ctx.lineTo(-5, -5);
+        ctx.lineTo(0, -9);
+        ctx.lineTo(5, -5);
+        ctx.lineTo(9, 1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(0, -6, 2, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -1474,21 +1497,21 @@ export class CloudCourierGame {
       if (this.cloud.x + 20 >= g.x && this.cloud.x - 20 <= g.x + g.w) {
         if (this.cloud.y - 16 <= g.topH || this.cloud.y + 16 >= g.bottomY) {
           // Take acid pollution damage
-          this.cloud.purity = Math.max(0, this.cloud.purity - 52 * dt);
-          this.damageFlash = Math.min(1.0, this.damageFlash + 0.40);
-          this.screenShake = 7;
+          this.cloud.purity = Math.max(0, this.cloud.purity - 46 * dt);
+          this.damageFlash = Math.min(0.65, this.damageFlash + 0.22);
+          this.screenShake = 3.5;
 
-          // Sizzling soot and acid particles
-          for (let p = 0; p < 2; p++) {
+          // Sizzling soot and acid particles (lightweight)
+          if (this.particles.length < 20) {
             this.particles.push({
-              x: this.cloud.x + (Math.random() * 20 - 10),
-              y: this.cloud.y + (Math.random() * 16 - 8),
-              vx: -scrollSpeed * 0.5 + (Math.random() - 0.5) * 60,
-              vy: (Math.random() - 0.5) * 80,
-              size: 4 + Math.random() * 5,
+              x: this.cloud.x + (Math.random() * 16 - 8),
+              y: this.cloud.y + (Math.random() * 12 - 6),
+              vx: -scrollSpeed * 0.4 + (Math.random() - 0.5) * 40,
+              vy: (Math.random() - 0.5) * 50,
+              size: 3 + Math.random() * 4,
               color: Math.random() < 0.5 ? '#ef4444' : '#475569',
-              life: 0.45,
-              maxLife: 0.45
+              life: 0.35,
+              maxLife: 0.35
             });
           }
 
@@ -1674,6 +1697,9 @@ export class CloudCourierGame {
     } else if (equippedGlider?.id === 'golden_cloud') {
       cloudColor = '#fef08a';
       cloudGlow = '#fbbf24';
+    } else if (equippedGlider?.id === 'stellar_supernova') {
+      cloudColor = '#fed7aa';
+      cloudGlow = '#f59e0b';
     } else if (equippedGlider?.id === 'aurora') {
       cloudColor = '#a7f3d0';
       cloudGlow = '#10b981';
@@ -1767,6 +1793,25 @@ export class CloudCourierGame {
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+    } else if (equippedCrown?.id === 'celestial_diadem') {
+      ctx.save();
+      ctx.translate(0, -20);
+      ctx.fillStyle = '#e0f2fe';
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.moveTo(-8, 1);
+      ctx.lineTo(-4, -5);
+      ctx.lineTo(0, -8);
+      ctx.lineTo(4, -5);
+      ctx.lineTo(8, 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.arc(0, -5.5, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
     ctx.restore();
@@ -1782,14 +1827,16 @@ export class CloudCourierGame {
       ctx.shadowBlur = 0;
     });
 
-    // 7. Damage Flash Vignette Overlay (Red alert across screen borders)
+    // 7. Damage Flash Overlay (Lightweight, zero-lag performance)
     if (this.damageFlash > 0) {
-      const redGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.72);
-      redGrad.addColorStop(0, 'rgba(239, 68, 68, 0)');
-      redGrad.addColorStop(1, `rgba(239, 68, 68, ${this.damageFlash * 0.65})`);
-      ctx.fillStyle = redGrad;
+      ctx.fillStyle = `rgba(239, 68, 68, ${this.damageFlash * 0.20})`;
       ctx.fillRect(0, 0, w, h);
-      this.damageFlash = Math.max(0, this.damageFlash - 2.2 * 0.016);
+
+      ctx.strokeStyle = `rgba(239, 68, 68, ${this.damageFlash * 0.70})`;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, w, h);
+
+      this.damageFlash = Math.max(0, this.damageFlash - 3.8 * 0.016);
     }
 
     // 8. Milestone Celebration Banner
@@ -1904,11 +1951,16 @@ export class CloudCourierGame {
   start() {
     this.isRunning = true;
     this.isPaused = false;
-    const loop = () => {
+    this.lastTime = performance.now();
+    const loop = (t) => {
       if (!this.isRunning) return;
       if (!this.isPaused) {
-        this.update(0.016);
+        const dt = Math.min(0.05, (t - this.lastTime) / 1000);
+        this.lastTime = t;
+        this.update(dt);
         this.render();
+      } else {
+        this.lastTime = t;
       }
       this.rafId = requestAnimationFrame(loop);
     };
@@ -2132,11 +2184,16 @@ export class OzoneDriftGame {
   start() {
     this.isRunning = true;
     this.isPaused = false;
-    const loop = () => {
+    this.lastTime = performance.now();
+    const loop = (t) => {
       if (!this.isRunning) return;
       if (!this.isPaused) {
-        this.update(0.016);
+        const dt = Math.min(0.05, (t - this.lastTime) / 1000);
+        this.lastTime = t;
+        this.update(dt);
         this.render();
+      } else {
+        this.lastTime = t;
       }
       this.rafId = requestAnimationFrame(loop);
     };
@@ -2201,7 +2258,6 @@ export class CoralCurrentGame {
     // Entities
     this.corals = [];
     this.predators = [];
-    this.thermalUpwellings = [];
     this.seaSponges = [];
 
     this.nextPredatorDist = 300;
@@ -2215,7 +2271,6 @@ export class CoralCurrentGame {
   initReef() {
     this.corals = [];
     this.predators = [];
-    this.thermalUpwellings = [];
     this.seaSponges = [];
 
     // Generate initial undulating reef cavern (Floor AND Ceiling corals across entire screen)
@@ -2266,19 +2321,11 @@ export class CoralCurrentGame {
       revived: false
     });
 
-    // Upwelling column or healing sponge every 4 clusters
-    if (index % 4 === 2) {
-      this.thermalUpwellings.push({
-        x: x + 90,
-        y: 0,
-        w: 52,
-        h,
-        tempAnomaly: -2.4 // Cool thermal refugium
-      });
-    } else if (index % 4 === 0) {
+    // Spawn healing sea sponge periodically
+    if (index % 3 === 0) {
       this.seaSponges.push({
         x: x + 80,
-        y: h * 0.45 + (Math.random() * 120 - 60),
+        y: h * 0.45 + (Math.random() * 140 - 70),
         collected: false
       });
     }
@@ -2618,23 +2665,25 @@ export class CoralCurrentGame {
         if (this.turtle.invulnTimer <= 0 && !this.turtle.isDashing) {
           // CHOMP! Devastating shark bite
           this.turtle.hp = Math.max(0, this.turtle.hp - 25);
-          this.turtle.invulnTimer = 1.2;
-          this.biteFlash = 0.95;
-          this.screenShake = 10;
+          this.turtle.invulnTimer = 1.0;
+          this.biteFlash = 0.55;
+          this.screenShake = 3.5;
           this.playSfx('bite');
 
-          // Blood / bubble splash particles
-          for (let i = 0; i < 14; i++) {
-            this.particles.push({
-              x: this.turtle.x,
-              y: this.turtle.y,
-              vx: (Math.random() - 0.5) * 140,
-              vy: (Math.random() - 0.5) * 140,
-              size: 3 + Math.random() * 4,
-              color: Math.random() < 0.6 ? '#ef4444' : '#bae6fd',
-              life: 0.6,
-              maxLife: 0.6
-            });
+          // Blood / bubble splash particles (lightweight)
+          if (this.particles.length < 16) {
+            for (let i = 0; i < 4; i++) {
+              this.particles.push({
+                x: this.turtle.x,
+                y: this.turtle.y,
+                vx: (Math.random() - 0.5) * 80,
+                vy: (Math.random() - 0.5) * 80,
+                size: 2.5 + Math.random() * 3,
+                color: Math.random() < 0.6 ? '#ef4444' : '#bae6fd',
+                life: 0.4,
+                maxLife: 0.4
+              });
+            }
           }
 
           // Floating damage popup
@@ -2700,7 +2749,7 @@ export class CoralCurrentGame {
         if (isScraping && this.turtle.invulnTimer <= 0 && !this.turtle.isDashing) {
           this.turtle.hp = Math.max(0, this.turtle.hp - 10);
           this.turtle.invulnTimer = 0.8;
-          this.screenShake = 6;
+          this.screenShake = 2.5;
           this.playSfx('scrape');
 
           this.damagePopups.push({
@@ -2727,17 +2776,6 @@ export class CoralCurrentGame {
       const maxX = this.corals.reduce((m, c) => Math.max(m, c.x), this.canvas.width);
       this.spawnCoralPair(maxX + 160, Math.floor(this.distance / 10) + this.corals.length);
     }
-
-    // Update Cool Thermal Upwellings (Healing refugia)
-    this.thermalUpwellings.forEach(u => {
-      u.x -= scrollSpeed * dt;
-      if (Math.abs(this.turtle.x - u.x) < 32) {
-        this.turtle.vy = -160; // Upwelling lift
-        this.turtle.hp = Math.min(100, this.turtle.hp + 20 * dt);
-        this.turtle.stamina = Math.min(100, this.turtle.stamina + 35 * dt);
-      }
-    });
-    this.thermalUpwellings = this.thermalUpwellings.filter(u => u.x > -100);
 
     // Update Sea Sponges
     this.seaSponges.forEach(s => {
@@ -2827,22 +2865,7 @@ export class CoralCurrentGame {
     ctx.fillStyle = '#eab308';
     ctx.fillRect(0, h - 40, w, 6);
 
-    // 5. Cool Thermal Upwellings (NOAA Coral Refugia columns)
-    this.thermalUpwellings.forEach(u => {
-      const grad = ctx.createLinearGradient(u.x, 0, u.x, h);
-      grad.addColorStop(0, 'rgba(56, 189, 248, 0.05)');
-      grad.addColorStop(0.5, 'rgba(56, 189, 248, 0.28)');
-      grad.addColorStop(1, 'rgba(16, 185, 129, 0.22)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(u.x - u.w / 2, 0, u.w, h);
-
-      ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 9.5px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText('❄️ COOL REFUGIUM', u.x, 30);
-    });
-
-    // 6. Sea Sponges (HP Recovery motes)
+    // 5. Sea Sponges (HP Recovery motes)
     this.seaSponges.forEach(s => {
       if (s.collected) return;
       ctx.fillStyle = '#f43f5e';
@@ -3159,6 +3182,25 @@ export class CoralCurrentGame {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+      } else if (equippedCrown?.id === 'celestial_diadem') {
+        ctx.save();
+        ctx.translate(0, -16);
+        ctx.fillStyle = '#e0f2fe';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.moveTo(-8, 1);
+        ctx.lineTo(-4, -5);
+        ctx.lineTo(0, -8);
+        ctx.lineTo(4, -5);
+        ctx.lineTo(8, 1);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(0, -5.5, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
     }
     ctx.restore();
@@ -3174,14 +3216,14 @@ export class CoralCurrentGame {
       ctx.shadowBlur = 0;
     });
 
-    // 11. Red Bite Screen Flash Overlay
+    // 11. Red Bite Screen Flash Overlay (Lightweight zero-lag border flash)
     if (this.biteFlash > 0) {
-      const redVignette = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75);
-      redVignette.addColorStop(0, 'rgba(239, 68, 68, 0)');
-      redVignette.addColorStop(1, `rgba(239, 68, 68, ${this.biteFlash * 0.75})`);
-      ctx.fillStyle = redVignette;
+      ctx.fillStyle = `rgba(239, 68, 68, ${this.biteFlash * 0.18})`;
       ctx.fillRect(0, 0, w, h);
-      this.biteFlash = Math.max(0, this.biteFlash - 2.5 * 0.016);
+      ctx.strokeStyle = `rgba(239, 68, 68, ${this.biteFlash * 0.65})`;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, w, h);
+      this.biteFlash = Math.max(0, this.biteFlash - 3.5 * 0.016);
     }
 
     // 12. Milestone Celebration Banner
@@ -3294,11 +3336,16 @@ export class CoralCurrentGame {
   start() {
     this.isRunning = true;
     this.isPaused = false;
-    const loop = () => {
+    this.lastTime = performance.now();
+    const loop = (t) => {
       if (!this.isRunning) return;
       if (!this.isPaused) {
-        this.update(0.016);
+        const dt = Math.min(0.05, (t - this.lastTime) / 1000);
+        this.lastTime = t;
+        this.update(dt);
         this.render();
+      } else {
+        this.lastTime = t;
       }
       this.rafId = requestAnimationFrame(loop);
     };
@@ -3609,11 +3656,16 @@ export class LastForestGame {
   start() {
     this.isRunning = true;
     this.isPaused = false;
-    const loop = () => {
+    this.lastTime = performance.now();
+    const loop = (t) => {
       if (!this.isRunning) return;
       if (!this.isPaused) {
-        this.update(0.016);
+        const dt = Math.min(0.05, (t - this.lastTime) / 1000);
+        this.lastTime = t;
+        this.update(dt);
         this.render();
+      } else {
+        this.lastTime = t;
       }
       this.rafId = requestAnimationFrame(loop);
     };

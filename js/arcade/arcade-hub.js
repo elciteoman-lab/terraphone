@@ -271,8 +271,9 @@ export class ArcadeHub {
                     let swatchStyle = `background: ${item.hex};`;
                     if (item.type === 'gradient' && item.colors) {
                       swatchStyle = `background: linear-gradient(135deg, ${item.colors.join(', ')});`;
+                      if (item.id === 'quantum_singularity') swatchStyle += ' box-shadow: 0 0 10px rgba(147, 51, 234, 0.85);';
                     } else if (item.type === 'crown' || item.hasCrown) {
-                      swatchStyle = `background: linear-gradient(135deg, #ffd700, #b45309); box-shadow: 0 0 10px rgba(255, 215, 0, 0.7);`;
+                      swatchStyle = `background: linear-gradient(135deg, #ffd700, #b45309); box-shadow: 0 0 12px rgba(255, 215, 0, 0.85);`;
                     } else if (item.type === 'textured') {
                       if (item.pattern === 'carbon') {
                         swatchStyle = `background: repeating-linear-gradient(45deg, #1e293b, #1e293b 3px, #0f172a 3px, #0f172a 6px); border: 1px solid #38bdf8;`;
@@ -284,7 +285,7 @@ export class ArcadeHub {
                       <div class="shop-item ${isUnlocked ? 'unlocked' : ''} ${isEquipped ? 'equipped' : ''}" data-cat="carPaints" data-id="${item.id}" data-cost="${item.cost}">
                         <div class="color-swatch" style="${swatchStyle}"></div>
                         <span class="shop-item-name">${item.name}</span>
-                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
+                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost.toLocaleString()} 🪙`}</span>
                       </div>
                     `;
                   }).join('')}
@@ -305,12 +306,14 @@ export class ArcadeHub {
                       swatchStyle = `background: radial-gradient(circle, #0c0e18 40%, #38bdf8 70%); box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);`;
                     } else if (item.id === 'phoenix_crest') {
                       swatchStyle = `background: linear-gradient(135deg, #f97316, #ef4444); box-shadow: 0 0 10px rgba(249, 115, 22, 0.8);`;
+                    } else if (item.id === 'celestial_diadem') {
+                      swatchStyle = `background: linear-gradient(135deg, #e0f2fe, #38bdf8); box-shadow: 0 0 12px rgba(56, 189, 248, 0.9);`;
                     }
                     return `
                       <div class="shop-item ${isUnlocked ? 'unlocked' : ''} ${isEquipped ? 'equipped' : ''}" data-cat="crowns" data-id="${item.id}" data-cost="${item.cost}">
                         <div class="color-swatch" style="${swatchStyle}"></div>
                         <span class="shop-item-name">${item.name}</span>
-                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
+                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost.toLocaleString()} 🪙`}</span>
                       </div>
                     `;
                   }).join('')}
@@ -327,12 +330,15 @@ export class ArcadeHub {
                     let swatchStyle = `background: ${item.hex};`;
                     if (item.type === 'gradient' && item.colors) {
                       swatchStyle = `background: linear-gradient(135deg, ${item.colors.join(', ')});`;
+                      if (item.id === 'stellar_supernova') swatchStyle += ' box-shadow: 0 0 10px rgba(251, 191, 36, 0.8);';
+                    } else if (item.id === 'golden_cloud') {
+                      swatchStyle = `background: linear-gradient(135deg, #ffd700, #b45309); box-shadow: 0 0 12px rgba(255, 215, 0, 0.85);`;
                     }
                     return `
                       <div class="shop-item ${isUnlocked ? 'unlocked' : ''} ${isEquipped ? 'equipped' : ''}" data-cat="gliderSkins" data-id="${item.id}" data-cost="${item.cost}">
                         <div class="color-swatch" style="${swatchStyle}"></div>
                         <span class="shop-item-name">${item.name}</span>
-                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
+                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost.toLocaleString()} 🪙`}</span>
                       </div>
                     `;
                   }).join('')}
@@ -349,12 +355,15 @@ export class ArcadeHub {
                     let swatchStyle = `background: ${item.hex};`;
                     if (item.type === 'gradient' && item.colors) {
                       swatchStyle = `background: linear-gradient(135deg, ${item.colors.join(', ')});`;
+                      if (item.id === 'cosmic_pulsar') swatchStyle += ' box-shadow: 0 0 10px rgba(6, 182, 212, 0.85);';
+                    } else if (item.id === 'sovereign_gold') {
+                      swatchStyle = `background: linear-gradient(135deg, #ffd700, #b45309); box-shadow: 0 0 12px rgba(255, 215, 0, 0.85);`;
                     }
                     return `
                       <div class="shop-item ${isUnlocked ? 'unlocked' : ''} ${isEquipped ? 'equipped' : ''}" data-cat="spiritGlows" data-id="${item.id}" data-cost="${item.cost}">
                         <div class="color-swatch" style="${swatchStyle}"></div>
                         <span class="shop-item-name">${item.name}</span>
-                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
+                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost.toLocaleString()} 🪙`}</span>
                       </div>
                     `;
                   }).join('')}
@@ -526,7 +535,7 @@ export class ArcadeHub {
     const modal = document.getElementById('arcade-shop-modal');
     if (!modal) return;
     const bal = document.getElementById('modal-token-balance');
-    if (bal) bal.textContent = `${p.tokens} 🪙`;
+    if (bal) bal.textContent = `${p.tokens.toLocaleString()} 🪙`;
 
     // Re-render categories
     modal.querySelectorAll('.shop-item').forEach(itemEl => {
@@ -545,7 +554,7 @@ export class ArcadeHub {
       itemEl.classList.toggle('equipped', isEquipped);
       const costEl = itemEl.querySelector('.shop-item-cost');
       if (costEl) {
-        costEl.textContent = isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${itemEl.getAttribute('data-cost')} 🪙`;
+        costEl.textContent = isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${parseInt(itemEl.getAttribute('data-cost'), 10).toLocaleString()} 🪙`;
       }
     });
   }
