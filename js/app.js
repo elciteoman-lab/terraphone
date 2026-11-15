@@ -21,6 +21,7 @@ import { SearchController } from './search.js';
 import { SoundOfChangeEngine } from './sound-of-change.js';
 import { ArcadeHub } from './arcade/arcade-hub.js';
 import { arcadeTokens } from './arcade/arcade-tokens.js';
+import { initCalmUI } from './ui.js';
 
 // Free Public Basemaps: Physical Elevation-Colored Topography (No API Keys)
 const BASEMAP_TILES = {
@@ -106,6 +107,7 @@ class App {
     this.initSoundOfChange();
     this.initArcade();
     this.initNavigation();
+    initCalmUI();
     this.loadGlobalPrecipitationBuffer();
   }
 
@@ -283,7 +285,7 @@ class App {
         }
       },
       center: [0, 15],
-      zoom: 2.15,
+      zoom: Math.max(1.2, 2.15 + Math.log2(Math.min(1, window.innerWidth / window.innerHeight))),
       minZoom: 1.2,
       maxZoom: 11,
       pitch: 0,
@@ -291,6 +293,7 @@ class App {
       renderWorldCopies: false,
       attributionControl: false
     });
+    this.updateZoomDisplay();
 
     this.map.on('style.load', () => {
       this.applyTerrainBumpiness();
@@ -632,6 +635,7 @@ class App {
   // ==========================================
 
   startZenAutoRotation() {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     if (this.isAutoRotating) return;
     this.isAutoRotating = true;
     let lastTime = performance.now();
@@ -674,14 +678,16 @@ class App {
 
   toggleUiVisibility() {
     this.isZenMode = document.body.classList.toggle('zen-mode');
+    document.getElementById('btn-hide-ui')?.setAttribute('aria-pressed', String(this.isZenMode));
+    document.getElementById('explore-menu')?.removeAttribute('open');
     const toast = document.getElementById('zen-toast');
 
     if (this.isZenMode) {
       if (toast) {
         const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
         toast.textContent = isTouch
-          ? 'Zen Mode · Auto-rotating (Tap "Exit Zen Mode" to restore UI)'
-          : 'Zen Mode · Auto-rotating (Press H or click Exit to restore UI)';
+          ? 'Take your time. Tap Exit Zen Mode to return.'
+          : 'Take your time. Press H or click Exit to return.';
         toast.classList.add('visible');
         setTimeout(() => toast.classList.remove('visible'), 3600);
       }
@@ -927,7 +933,7 @@ class App {
     this.hudRate.textContent = rateStr;
     this.hudRainType.innerHTML = `${rainType.icon} <span>${rainType.tag}</span>`;
     this.hudLocation.textContent = locationName;
-    this.hudStatus.textContent = this.isListening ? 'LIVE AUDIO ACTIVE' : 'CLICK TO LISTEN';
+    this.hudStatus.textContent = !this.isListening ? 'CLICK TO LISTEN' : this.sound.isMuted ? 'AUDIO PAUSED' : 'LISTENING';
 
     const logNorm = Math.min(1.0, Math.max(0, Math.log10(Math.max(0.01, rate) + 0.1) / 2.2));
     this.rainGaugeFill.style.width = `${Math.round(logNorm * 100)}%`;
@@ -1562,6 +1568,9 @@ class App {
       ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>Pause</span>`
       : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Listen</span>`;
     btn.classList.toggle('active', isPlaying);
+    btn.setAttribute('aria-pressed', String(isPlaying));
+    btn.setAttribute('aria-label', isPlaying ? 'Pause the soundscape' : 'Listen to the selected location');
+    if (this.isListening) this.hudStatus.textContent = isPlaying ? 'LISTENING' : 'AUDIO PAUSED';
   }
 
   toggleFullscreen() {
@@ -1651,9 +1660,8 @@ class App {
     btnArcade?.addEventListener('click', () => {
       this.switchExperience(this.currentView === 'arcade' ? 'rain' : 'arcade');
     });
-    brand?.addEventListener('click', () => {
-      this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');
-    });
+    brand?.addEventListener('click', () => this.switchExperience('rain'));
+    document.getElementById('btn-global-rain')?.addEventListener('click', () => this.switchExperience('rain'));
 
     // Hash routing
     const handleHash = () => {
@@ -1676,6 +1684,15 @@ class App {
   switchExperience(viewName, updateHash = true) {
     if (this.currentView === viewName && !updateHash) return;
     this.currentView = viewName;
+    document.body.dataset.experience = viewName;
+    document.getElementById('explore-menu')?.removeAttribute('open');
+    document.getElementById('hud-bottom-right')?.classList.remove('mobile-open');
+    document.getElementById('btn-mobile-mixer')?.setAttribute('aria-expanded', 'false');
+    for (const [id, view] of [['btn-global-rain', 'rain'], ['btn-sound-of-change', 'sound-of-change'], ['btn-arcade', 'arcade']]) {
+      const button = document.getElementById(id);
+      if (view === viewName) button?.setAttribute('aria-current', 'page');
+      else button?.removeAttribute('aria-current');
+    }
 
     const btnSoc = document.getElementById('btn-sound-of-change');
     const btnArcade = document.getElementById('btn-arcade');
@@ -1813,42 +1830,40 @@ class App {
     const btnMobileMixer = document.getElementById('btn-mobile-mixer');
     const hudBottomRight = document.getElementById('hud-bottom-right');
     const btnCloseMixer = document.getElementById('btn-close-mixer');
+    const hudBottomLeft = document.getElementById('hud-bottom-left');
 
-    const syncPillVisibility = () => {
-      if (hudBottomLeft && hudBottomRight) {
-        const isMixerOpen = hudBottomRight.classList.contains('mobile-open');
-        hudBottomLeft.style.display = isMixerOpen ? 'none' : '';
-      }
+    const syncMixerState = () => {
+      btnMobileMixer?.setAttribute('aria-expanded', String(hudBottomRight?.classList.contains('mobile-open') || false));
     };
 
     if (btnMobileMixer && hudBottomRight) {
       btnMobileMixer.addEventListener('click', (e) => {
         e.stopPropagation();
         hudBottomRight.classList.toggle('mobile-open');
-        syncPillVisibility();
+        syncMixerState();
       });
     }
 
     if (new URLSearchParams(window.location.search).has('mixer') && hudBottomRight) {
       hudBottomRight.classList.add('mobile-open');
-      syncPillVisibility();
+      syncMixerState();
     }
 
     if (btnCloseMixer && hudBottomRight) {
       btnCloseMixer.addEventListener('click', (e) => {
         e.stopPropagation();
         hudBottomRight.classList.remove('mobile-open');
-        syncPillVisibility();
+        syncMixerState();
       });
     }
 
     const mobilePillHeader = document.getElementById('hud-mobile-pill-header');
-    const hudBottomLeft = document.getElementById('hud-bottom-left');
 
     if (mobilePillHeader && hudBottomLeft) {
       mobilePillHeader.addEventListener('click', (e) => {
         e.stopPropagation();
         hudBottomLeft.classList.toggle('expanded');
+        document.getElementById('btn-toggle-hud')?.setAttribute('aria-expanded', String(hudBottomLeft.classList.contains('expanded')));
       });
     }
 
@@ -1857,7 +1872,8 @@ class App {
         if (hudBottomRight) hudBottomRight.classList.remove('mobile-open');
         if (hudBottomLeft) {
           hudBottomLeft.classList.remove('expanded');
-          syncPillVisibility();
+          document.getElementById('btn-toggle-hud')?.setAttribute('aria-expanded', 'false');
+          syncMixerState();
         }
       });
     }
