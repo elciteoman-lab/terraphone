@@ -78,10 +78,9 @@ class App {
 
     // UI elements
     this.cursorTracker = document.getElementById('cursor-tracker');
-    this.trackerRate = document.getElementById('tracker-rate');
-    this.trackerTag = document.getElementById('tracker-tag');
-    this.trackerCoords = document.getElementById('tracker-coords');
-    this.trackerHint = document.getElementById('tracker-hint');
+    this.readout = document.getElementById('rain-readout');
+    this.readingLocation = document.getElementById('reading-location');
+    this.readingRate = document.getElementById('reading-rate');
 
     this.rainGaugeFill = document.getElementById('rain-gauge-fill');
     this.hudRate = document.getElementById('hud-rate');
@@ -92,22 +91,23 @@ class App {
 
     // Experience views ('rain' | 'sound-of-change' | 'arcade')
     this.currentView = 'rain';
-    this.soundOfChange = new SoundOfChangeEngine(this.sound.ctx);
+    this.soundOfChange = null;
     this.arcade = null;
 
     this.initTheme();
-    this.initMap();
+    this.start();
+  }
+
+  async start() {
+    await this.initMap();
     this.initAudioMixer();
     this.initControls();
     this.initSearch();
     this.initLeaderboard();
     this.initInfocardHover();
-    this.initStarsBackground();
     this.initMobileUI();
-    this.initSoundOfChange();
-    this.initArcade();
-    this.initNavigation();
     initCalmUI();
+    this.initNavigation();
     this.loadGlobalPrecipitationBuffer();
   }
 
@@ -142,7 +142,7 @@ class App {
     document.documentElement.setAttribute('data-theme', effective);
     document.documentElement.setAttribute('data-theme-setting', this.themeMode);
 
-    if (this.map && this.map.isStyleLoaded()) {
+    if (this.map?.isStyleLoaded?.()) {
       this.updateMapThemeStyles(effective);
     }
   }
@@ -174,15 +174,13 @@ class App {
   // 3D BUMPY GLOBE WITH HOVERING CLOUD DECK
   // ==========================================
 
-  initMap() {
+  async initMap() {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const rainWmts = this.buildWmtsUrl(this.activeRainLayerId);
 
     // Globe starts centered symmetrically at pitch 0 for wobble-free rotation
-    this.map = new maplibregl.Map({
+    const options = {
       container: 'map',
-      minZoom: 1.5,
-      maxZoom: 11.5,
       style: {
         version: 8,
         projection: { type: 'globe' },
@@ -292,7 +290,18 @@ class App {
       bearing: 0,
       renderWorldCopies: false,
       attributionControl: false
-    });
+    };
+    try {
+      this.map = new maplibregl.Map(options);
+    } catch (error) {
+      const { CanvasGlobe } = await import('./canvas-globe.js');
+      this.map = new CanvasGlobe(document.getElementById('map'));
+      this.canvasGlobe = this.map;
+      document.getElementById('atlas-credit').hidden = false;
+      document.getElementById('btn-relief-toggle').closest('.relief-toggle-row').hidden = true;
+      document.getElementById('map-source').textContent = '2D globe · NASA Blue Marble';
+      console.info('Using the 2D globe because WebGL is unavailable.', error.message);
+    }
     this.updateZoomDisplay();
 
     this.map.on('style.load', () => {
@@ -309,6 +318,11 @@ class App {
 
     // Mousemove listener with RAF throttle
     this.map.on('mousemove', (e) => {
+      if (this.isZenMode) {
+        this.handleZenUserActivity();
+        return;
+      }
+      if (this.currentView !== 'rain' || !this.isRasterReady) return;
       this.lastMouseEvt = e;
       if (!this.mouseRafPending) {
         this.mouseRafPending = true;
@@ -318,10 +332,6 @@ class App {
             this.handleMouseMove(this.lastMouseEvt);
           }
         });
-      }
-
-      if (this.isZenMode) {
-        this.handleZenUserActivity();
       }
     });
 
@@ -349,11 +359,11 @@ class App {
       }
 
       try {
-        if (this.map && this.map.getLayer('cloud-deck-layer')) {
+        if (this.map?.getLayer?.('cloud-deck-layer')) {
           this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.95);
           setTimeout(() => {
             try {
-              if (this.map && this.map.getLayer('cloud-deck-layer')) {
+              if (this.map?.getLayer?.('cloud-deck-layer')) {
                 this.map.setPaintProperty('cloud-deck-layer', 'raster-contrast', 0.65);
               }
             } catch (e) {}
@@ -466,15 +476,6 @@ class App {
         })
       );
 
-      this.pixelData = this.samplingCtx.getImageData(0, 0, 512, 512).data;
-      this.isRasterReady = true;
-
-      const dot = document.getElementById('connection-dot');
-      if (dot) dot.className = 'dot ok';
-
-      if (this.listeningTarget) {
-        this.setListeningPoint(this.listeningTarget.lng, this.listeningTarget.lat, this.listeningTarget.label, false);
-      }
     } catch (err) {
       console.warn('WMTS 4-tile buffer fetch fallback to WMS:', err);
       try {
@@ -488,11 +489,16 @@ class App {
         await img.decode();
         this.samplingCtx.clearRect(0, 0, 512, 512);
         this.samplingCtx.drawImage(img, 0, 0, 512, 512);
-        this.pixelData = this.samplingCtx.getImageData(0, 0, 512, 512).data;
-        this.isRasterReady = true;
       } catch (e) {
         console.warn('Raster precipitation buffer unavailable:', e);
+        return;
       }
+    }
+    this.pixelData = this.samplingCtx.getImageData(0, 0, 512, 512).data;
+    this.isRasterReady = true;
+    this.canvasGlobe?.setRain(this.pixelData);
+    if (this.listeningTarget && this.currentView === 'rain') {
+      this.setListeningPoint(this.listeningTarget.lng, this.listeningTarget.lat, this.listeningTarget.label, false);
     }
   }
 
@@ -680,17 +686,10 @@ class App {
     this.isZenMode = document.body.classList.toggle('zen-mode');
     document.getElementById('btn-hide-ui')?.setAttribute('aria-pressed', String(this.isZenMode));
     document.getElementById('explore-menu')?.removeAttribute('open');
-    const toast = document.getElementById('zen-toast');
+    this.hideCursorTracker();
+    document.getElementById(this.isZenMode ? 'btn-exit-zen' : 'btn-explore').focus({ preventScroll: true });
 
     if (this.isZenMode) {
-      if (toast) {
-        const isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        toast.textContent = isTouch
-          ? 'Take your time. Tap Exit Zen Mode to return.'
-          : 'Take your time. Press H or click Exit to return.';
-        toast.classList.add('visible');
-        setTimeout(() => toast.classList.remove('visible'), 3600);
-      }
       this.startZenAutoRotation();
 
       // Zen Token Economy: 1 token accrued per active minute in Zen mode (up to daily cap)
@@ -707,7 +706,6 @@ class App {
         clearInterval(this.zenTokenInterval);
         this.zenTokenInterval = null;
       }
-      if (toast) toast.classList.remove('visible');
     }
   }
 
@@ -720,36 +718,18 @@ class App {
   // ==========================================
 
   handleMouseMove(e) {
-    if (!this.map) return;
+    if (!this.map || this.isZenMode || this.currentView !== 'rain') return;
     const { lng, lat } = e.lngLat;
-    const rate = this.sampleRateAt(lng, lat);
-    const rainType = getRainType(rate);
-
-    const latStr = `${Math.abs(lat).toFixed(1)}°${lat >= 0 ? 'N' : 'S'}`;
-    const lngStr = `${Math.abs(lng).toFixed(1)}°${lng >= 0 ? 'E' : 'W'}`;
-
-    this.trackerRate.textContent = rate < 0.05 ? '0.0 mm/h' : `${rate.toFixed(1)} mm/h`;
-    this.trackerTag.textContent = `${rainType.icon} ${rainType.tag}`;
-    this.trackerCoords.textContent = `${latStr}, ${lngStr}`;
-
-    const isCurrentTarget =
-      this.listeningTarget &&
-      Math.abs(this.listeningTarget.lng - lng) < 0.4 &&
-      Math.abs(this.listeningTarget.lat - lat) < 0.4;
-
-    this.trackerHint.textContent = isCurrentTarget
-      ? 'Currently listening here'
-      : this.isListening
-      ? 'Click to listen here'
-      : 'Click anywhere to play live rain';
-
-    const x = Math.min(window.innerWidth - 230, Math.max(16, e.point.x + 18));
-    const y = Math.min(window.innerHeight - 110, Math.max(70, e.point.y + 18));
+    const value = this.sampleRateAt(lng, lat).toFixed(1) + ' mm/h';
+    if (this.cursorTracker.textContent !== value) this.cursorTracker.textContent = value;
+    const x = Math.min(window.innerWidth - 92, Math.max(6, e.point.x + 14));
+    const y = Math.min(window.innerHeight - 34, Math.max(6, e.point.y + 14));
     this.cursorTracker.style.transform = `translate3d(${x}px, ${y}px, 0)`;
     this.cursorTracker.classList.add('visible');
   }
 
   hideCursorTracker() {
+    this.lastMouseEvt = null;
     this.cursorTracker.classList.remove('visible');
   }
 
@@ -938,19 +918,25 @@ class App {
     const logNorm = Math.min(1.0, Math.max(0, Math.log10(Math.max(0.01, rate) + 0.1) / 2.2));
     this.rainGaugeFill.style.width = `${Math.round(logNorm * 100)}%`;
 
-    // Update compact mobile status pill
-    const pillIcon = document.getElementById('mobile-pill-icon');
-    const pillRate = document.getElementById('mobile-pill-rate');
-    const pillLoc = document.getElementById('mobile-pill-loc');
-    if (pillIcon) pillIcon.textContent = rainType ? rainType.icon : '🌧️';
-    if (pillRate) pillRate.textContent = `${rateStr} mm/h`;
-    if (pillLoc) pillLoc.textContent = locationName || 'Global Ocean';
-
-    this.populateInfocard(rainType, rate);
+    this.readout.hidden = false;
+    this.readingLocation.textContent = locationName;
+    this.readingRate.textContent = this.isRasterReady ? rateStr + ' mm/h' : '— mm/h';
+    if (!this.isRasterReady) {
+      this.hudRate.textContent = '—';
+      this.hudRainType.textContent = 'Rain data unavailable';
+    }
+    document.getElementById('hud-rain-indicator').disabled = !this.isRasterReady;
+    if (this.infocardContainer.classList.contains('visible') && this.isRasterReady) {
+      this.populateInfocard(rainType, rate);
+    }
   }
 
   updateListeningCrosshair(lng, lat) {
     if (!this.map) return;
+    if (this.canvasGlobe) {
+      this.canvasGlobe.mark(lng, lat);
+      return;
+    }
 
     if (!this.crosshairMarker) {
       const el = document.createElement('div');
@@ -983,25 +969,17 @@ class App {
     const indicator = document.getElementById('hud-rain-indicator');
     if (!indicator || !this.infocardContainer) return;
 
-    let hoverTimeout = null;
-
-    indicator.addEventListener('mouseenter', () => {
-      clearTimeout(hoverTimeout);
-      this.infocardContainer.classList.add('visible');
-    });
-
-    indicator.addEventListener('mouseleave', () => {
-      hoverTimeout = setTimeout(() => {
-        this.infocardContainer.classList.remove('visible');
-      }, 300);
-    });
-
-    this.infocardContainer.addEventListener('mouseenter', () => {
-      clearTimeout(hoverTimeout);
-    });
-
-    this.infocardContainer.addEventListener('mouseleave', () => {
-      this.infocardContainer.classList.remove('visible');
+    const setOpen = (open) => {
+      indicator.setAttribute('aria-expanded', String(open));
+      this.infocardContainer.classList.toggle('visible', open);
+      if (open && this.listeningTarget) {
+        const rate = this.listeningTarget.rate;
+        this.populateInfocard(getRainType(rate), rate);
+      }
+    };
+    indicator.addEventListener('click', () => setOpen(indicator.getAttribute('aria-expanded') !== 'true'));
+    this.readout.addEventListener('toggle', () => {
+      if (!this.readout.open) setOpen(false);
     });
   }
 
@@ -1336,7 +1314,10 @@ class App {
     const searchInput = document.getElementById('search-input');
     const suggestionsBox = document.getElementById('search-suggestions');
 
+    const explore = document.getElementById('explore-menu');
     new SearchController(searchInput, suggestionsBox, (item) => {
+      explore.open = false;
+      document.getElementById('btn-explore').focus();
       if (item.isHeaviestAction) {
         this.flyToHeaviestRainArea();
         return;
@@ -1345,15 +1326,17 @@ class App {
     });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === '/' && document.activeElement !== searchInput) {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === '/' && this.currentView === 'rain' && !this.isZenMode && document.activeElement !== searchInput) {
         e.preventDefault();
+        explore.open = true;
         searchInput.focus();
         searchInput.select();
       } else if (e.key === 'h' || e.key === 'H') {
-        if (document.activeElement !== searchInput) {
+        if (this.currentView === 'rain' && document.activeElement !== searchInput) {
           this.toggleUiVisibility();
         }
-      } else if (e.key === ' ' && document.activeElement !== searchInput && document.activeElement.tagName !== 'BUTTON') {
+      } else if (e.key === ' ' && !document.activeElement.closest('input, button, summary, a, select, textarea')) {
         if (this.currentView === 'arcade') {
           // Allow arcade games to consume spacebar for jump / boost / cruise
           return;
@@ -1469,19 +1452,8 @@ class App {
 
       targetLng = topSpot.lng;
       targetLat = topSpot.lat;
-      maxRate = highestObserved > 0 ? highestObserved : 12.8;
-      locationLabel = `${topSpot.label} (${maxRate.toFixed(1)} mm/hr)`;
-    }
-
-    const btn = document.getElementById('btn-heaviest');
-    if (btn) {
-      btn.classList.add('active');
-      const originalHtml = btn.innerHTML;
-      btn.innerHTML = `<span>⚡ Epicenter (${maxRate.toFixed(1)} mm/hr)</span>`;
-      setTimeout(() => {
-        btn.classList.remove('active');
-        btn.innerHTML = originalHtml;
-      }, 3500);
+      maxRate = highestObserved;
+      locationLabel = topSpot.label;
     }
 
     if (this.isZenMode) {
@@ -1564,9 +1536,7 @@ class App {
   updatePlayButtonVisual(isPlaying) {
     const btn = document.getElementById('btn-listen');
     if (!btn) return;
-    btn.innerHTML = isPlaying
-      ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>Pause</span>`
-      : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Listen</span>`;
+    btn.querySelector('span').textContent = isPlaying ? 'Pause' : 'Listen';
     btn.classList.toggle('active', isPlaying);
     btn.setAttribute('aria-pressed', String(isPlaying));
     btn.setAttribute('aria-label', isPlaying ? 'Pause the soundscape' : 'Listen to the selected location');
@@ -1588,17 +1558,9 @@ class App {
   }
 
   updateFullscreenVisual(isFs) {
-    const expandIcon = document.getElementById('fullscreen-icon-expand');
-    const compressIcon = document.getElementById('fullscreen-icon-compress');
-    const btnFs = document.getElementById('btn-fullscreen');
-    if (expandIcon && compressIcon) {
-      expandIcon.style.display = isFs ? 'none' : 'block';
-      compressIcon.style.display = isFs ? 'block' : 'none';
-    }
-    if (btnFs) {
-      btnFs.classList.toggle('active', isFs);
-      btnFs.setAttribute('title', isFs ? 'Exit Fullscreen' : 'Toggle Fullscreen (F11)');
-    }
+    const button = document.getElementById('btn-fullscreen');
+    button.setAttribute('aria-pressed', String(isFs));
+    button.textContent = isFs ? 'Exit fullscreen' : 'Fullscreen';
   }
 
   initControls() {
@@ -1655,12 +1617,21 @@ class App {
     const brand = document.getElementById('btn-brand');
 
     btnSoc?.addEventListener('click', () => {
-      this.switchExperience(this.currentView === 'sound-of-change' ? 'rain' : 'sound-of-change');
+      this.switchExperience('sound-of-change');
     });
     btnArcade?.addEventListener('click', () => {
-      this.switchExperience(this.currentView === 'arcade' ? 'rain' : 'arcade');
+      this.switchExperience('arcade');
     });
     brand?.addEventListener('click', () => this.switchExperience('rain'));
+    document.getElementById('btn-token-shop').addEventListener('click', () => {
+      this.switchExperience('arcade');
+      this.arcade.openShop();
+    });
+    const updateWallet = () => {
+      document.getElementById('hud-token-count').textContent = arcadeTokens.profile.tokens + ' tokens';
+    };
+    updateWallet();
+    window.addEventListener('terraphone_arcade_token_event', updateWallet);
     document.getElementById('btn-global-rain')?.addEventListener('click', () => this.switchExperience('rain'));
 
     // Hash routing
@@ -1683,8 +1654,14 @@ class App {
 
   switchExperience(viewName, updateHash = true) {
     if (this.currentView === viewName && !updateHash) return;
+    if (this.isZenMode) this.toggleUiVisibility();
+    this.readout.open = false;
+    this.hideCursorTracker();
+    if (this.currentView === 'sound-of-change' && viewName !== 'sound-of-change') this.soundOfChange.leave();
+    if (this.currentView === 'arcade' && viewName !== 'arcade') this.arcade.closeActiveGame();
     this.currentView = viewName;
     document.body.dataset.experience = viewName;
+    document.getElementById('map').inert = viewName !== 'rain';
     document.getElementById('explore-menu')?.removeAttribute('open');
     document.getElementById('hud-bottom-right')?.classList.remove('mobile-open');
     document.getElementById('btn-mobile-mixer')?.setAttribute('aria-expanded', 'false');
@@ -1694,189 +1671,56 @@ class App {
       else button?.removeAttribute('aria-current');
     }
 
-    const btnSoc = document.getElementById('btn-sound-of-change');
-    const btnArcade = document.getElementById('btn-arcade');
     const socView = document.getElementById('sound-of-change-view');
     const arcadeView = document.getElementById('arcade-view');
-    const rainCapsules = [
-      document.getElementById('hud-top-center'),
-      document.getElementById('hud-bottom-left'),
-      document.getElementById('hud-bottom-right'),
-      document.getElementById('cursor-tracker')
-    ];
+    socView.classList.toggle('active', viewName === 'sound-of-change');
+    arcadeView.classList.toggle('active', viewName === 'arcade');
 
-    if (viewName === 'sound-of-change') {
-      btnSoc?.classList.add('active');
-      btnArcade?.classList.remove('active');
-
-      if (!this.sound.ctx) this.sound.init();
-
-      rainCapsules.forEach(el => { if (el) el.style.display = 'none'; });
-      arcadeView?.classList.remove('active');
-      this.arcade?.closeActiveGame();
-
-      socView?.classList.add('active');
-      if (this.isListening) {
-        this.sound.updateRain(0, this.sound.currentZoom, false);
-      }
-      this.soundOfChange?.initVideo();
-
-      if (updateHash) window.history.replaceState(null, '', '#sound-of-change');
-    } else if (viewName === 'arcade') {
-      btnArcade?.classList.add('active');
-      btnSoc?.classList.remove('active');
-
-      if (!this.sound.ctx) this.sound.init();
-      if (this.arcade && this.sound.ctx) {
-        this.arcade.audioCtx = this.sound.ctx;
-      }
-
-      rainCapsules.forEach(el => { if (el) el.style.display = 'none'; });
-      socView?.classList.remove('active');
-      this.soundOfChange?.pauseAudio();
-
-      arcadeView?.classList.add('active');
-      if (this.isListening) {
-        this.sound.updateRain(0, this.sound.currentZoom, false);
-      }
-
-      if (updateHash) window.history.replaceState(null, '', '#arcade');
-    } else {
-      // Global Rain
-      btnSoc?.classList.remove('active');
-      btnArcade?.classList.remove('active');
-
-      socView?.classList.remove('active');
-      this.soundOfChange?.pauseAudio();
-
-      arcadeView?.classList.remove('active');
-      this.arcade?.closeActiveGame();
-
-      rainCapsules.forEach(el => { if (el) el.style.display = ''; });
-
+    if (viewName === 'rain') {
       if (this.isListening && this.listeningTarget) {
-        this.sound.updateRain(this.listeningTarget.rate, this.map ? this.map.getZoom() : 2.5, true);
+        this.sound.updateRain(this.listeningTarget.rate, this.map.getZoom(), true);
         this.sound.updateAmbience(this.currentEnv, true);
       }
-
-      if (updateHash) window.history.replaceState(null, '', '#rain');
-    }
-  }
-
-  initSoundOfChange() {
-    const socContainer = document.getElementById('sound-of-change-view');
-    if (!socContainer) return;
-    this.soundOfChange.mount(socContainer, this.sound.ctx);
-  }
-
-  initArcade() {
-    const arcadeContainer = document.getElementById('arcade-view');
-    if (!arcadeContainer) return;
-    this.arcade = new ArcadeHub(arcadeContainer, this.sound.ctx);
-    const hudTokens = document.getElementById('hud-token-count');
-    if (hudTokens) {
-      hudTokens.textContent = `${arcadeTokens.profile.tokens} Tokens`;
-    }
-  }
-
-  // ==========================================
-  // CELESTIAL BACKGROUND STARS (BEHIND GLOBE)
-  // ==========================================
-
-  initStarsBackground() {
-    const canvas = document.getElementById('stars-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-      drawStars();
-    };
-
-    const drawStars = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const numStars = Math.floor((canvas.width * canvas.height) / 4800);
-      for (let i = 0; i < numStars; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const r = Math.random() * 0.9 + 0.4;
-        const alpha = Math.random() * 0.16 + 0.08;
-
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        const tint = Math.random();
-        if (tint < 0.2) {
-          ctx.fillStyle = `rgba(186, 230, 253, ${alpha})`;
-        } else if (tint < 0.35) {
-          ctx.fillStyle = `rgba(254, 240, 138, ${alpha})`;
+    } else {
+      if (!this.sound.ctx) this.sound.init();
+      if (this.isListening) this.sound.updateRain(0, this.sound.currentZoom, false);
+      if (viewName === 'sound-of-change') {
+        if (this.soundOfChange) {
+          this.soundOfChange.initVideo();
         } else {
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+          this.soundOfChange = new SoundOfChangeEngine(this.sound.ctx);
+          this.soundOfChange.mount(socView, this.sound.ctx);
         }
-        ctx.fill();
+      } else if (!this.arcade) {
+        this.arcade = new ArcadeHub(arcadeView, this.sound.ctx);
       }
-    };
-
-    window.addEventListener('resize', resize, { passive: true });
-    resize();
+    }
+    if (updateHash) window.history.replaceState(null, '', '#' + viewName);
   }
-
-  // ==========================================
-  // MOBILE HUD & SLIDE-UP DRAWER CONTROLS
-  // ==========================================
 
   initMobileUI() {
-    const btnMobileMixer = document.getElementById('btn-mobile-mixer');
-    const hudBottomRight = document.getElementById('hud-bottom-right');
-    const btnCloseMixer = document.getElementById('btn-close-mixer');
-    const hudBottomLeft = document.getElementById('hud-bottom-left');
-
-    const syncMixerState = () => {
-      btnMobileMixer?.setAttribute('aria-expanded', String(hudBottomRight?.classList.contains('mobile-open') || false));
+    const button = document.getElementById('btn-mobile-mixer');
+    const panel = document.getElementById('hud-bottom-right');
+    const closeButton = document.getElementById('btn-close-mixer');
+    const setMixer = (open) => {
+      panel.classList.toggle('mobile-open', open);
+      button.setAttribute('aria-expanded', String(open));
+      if (open) this.readout.open = false;
     };
-
-    if (btnMobileMixer && hudBottomRight) {
-      btnMobileMixer.addEventListener('click', (e) => {
-        e.stopPropagation();
-        hudBottomRight.classList.toggle('mobile-open');
-        syncMixerState();
-      });
-    }
-
-    if (new URLSearchParams(window.location.search).has('mixer') && hudBottomRight) {
-      hudBottomRight.classList.add('mobile-open');
-      syncMixerState();
-    }
-
-    if (btnCloseMixer && hudBottomRight) {
-      btnCloseMixer.addEventListener('click', (e) => {
-        e.stopPropagation();
-        hudBottomRight.classList.remove('mobile-open');
-        syncMixerState();
-      });
-    }
-
-    const mobilePillHeader = document.getElementById('hud-mobile-pill-header');
-
-    if (mobilePillHeader && hudBottomLeft) {
-      mobilePillHeader.addEventListener('click', (e) => {
-        e.stopPropagation();
-        hudBottomLeft.classList.toggle('expanded');
-        document.getElementById('btn-toggle-hud')?.setAttribute('aria-expanded', String(hudBottomLeft.classList.contains('expanded')));
-      });
-    }
-
-    if (this.map) {
-      this.map.on('click', () => {
-        if (hudBottomRight) hudBottomRight.classList.remove('mobile-open');
-        if (hudBottomLeft) {
-          hudBottomLeft.classList.remove('expanded');
-          document.getElementById('btn-toggle-hud')?.setAttribute('aria-expanded', 'false');
-          syncMixerState();
-        }
-      });
-    }
+    button.addEventListener('click', () => {
+      const open = !panel.classList.contains('mobile-open');
+      setMixer(open);
+      if (open) closeButton.focus();
+    });
+    closeButton.addEventListener('click', () => {
+      setMixer(false);
+      button.focus();
+    });
+    if (new URLSearchParams(window.location.search).has('mixer')) setMixer(true);
+    this.map.on('click', () => {
+      setMixer(false);
+      this.readout.open = false;
+    });
   }
 
   updateZoomDisplay() {
@@ -1888,7 +1732,8 @@ class App {
   }
 
   refreshRainLayer() {
-    if (!this.map || !this.map.getSource('rain-source')) return;
+    if (this.canvasGlobe) return this.loadGlobalPrecipitationBuffer();
+    if (!this.map?.getSource('rain-source')) return;
     try {
       const newUrl = this.buildWmtsUrl(this.activeRainLayerId) + `&_t=${Date.now()}`;
       this.map.getSource('rain-source').setTiles([newUrl]);

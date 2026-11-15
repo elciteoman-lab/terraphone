@@ -98,6 +98,7 @@ To jump directly into an experience via URL hash:
 
 ## 🛰️ Scientific Attribution & References
 
+- **2D globe reference imagery:** NASA Blue Marble Next Generation, distributed in [Matplotlib Basemap](https://matplotlib.org/basemap/stable/users/geography.html). The bundled WebP is a geographic reference. The WebGL fallback loads it on demand and draws precipitation separately from the same live NASA buffer as the 3D map.
 - **NASA Scientific Visualization Studio (SVS)**: Entry 5650 *"Near Real-Time Global Precipitation from the GPM Constellation"* (Alex Kekesi & Dr. George Huffman).
 - **NASA Earthdata / GIBS**: Global Precipitation Measurement (GPM) IMERG 30-Minute Precipitation Rate.
 - **NASA TRMM / ISS LIS**: Lightning Imaging Sensor Flash Density & Convective Storm Core Dynamics.

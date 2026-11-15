@@ -333,14 +333,8 @@ export class ArcadeHub {
 
     // Shop modal triggers
     const shopModal = document.getElementById('arcade-shop-modal');
-    const openShop = () => {
-      this.updateShopModal();
-      if (shopModal) shopModal.style.display = 'flex';
-    };
-
-    document.getElementById('arcade-btn-shop')?.addEventListener('click', openShop);
-    document.getElementById('arcade-btn-open-garage')?.addEventListener('click', openShop);
-    document.getElementById('btn-token-shop')?.addEventListener('click', openShop);
+    document.getElementById('arcade-btn-shop')?.addEventListener('click', () => this.openShop());
+    document.getElementById('arcade-btn-open-garage')?.addEventListener('click', () => this.openShop());
 
     document.getElementById('arcade-btn-close-shop')?.addEventListener('click', () => {
       if (shopModal) shopModal.style.display = 'none';
@@ -359,12 +353,10 @@ export class ArcadeHub {
     if (!this._tokenListenerAttached) {
       window.addEventListener('terraphone_arcade_token_event', () => {
         const countEl = document.getElementById('arcade-token-count');
-        const hudCount = document.getElementById('hud-token-count');
         const heroTokens = document.getElementById('hero-vault-tokens');
         const modalBal = document.getElementById('modal-token-balance');
         const tokensText = `${arcadeTokens.profile.tokens} Tokens`;
         if (countEl) countEl.textContent = tokensText;
-        if (hudCount) hudCount.textContent = tokensText;
         if (heroTokens) heroTokens.textContent = tokensText;
         if (modalBal) modalBal.textContent = `${arcadeTokens.profile.tokens} 🪙`;
       });
@@ -396,6 +388,13 @@ export class ArcadeHub {
         }
       }
     });
+  }
+
+  openShop() {
+    this.updateShopModal();
+    const modal = document.getElementById('arcade-shop-modal');
+    if (modal) modal.style.display = 'flex';
+    document.getElementById('arcade-btn-close-shop')?.focus();
   }
 
   updateShopModal() {

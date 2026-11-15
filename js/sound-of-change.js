@@ -853,7 +853,13 @@ export class SoundOfChangeEngine {
     if (this.videoQuiet) {
       this.videoQuiet.play().catch(e => console.log('[SOC] Video play prevented:', e));
     }
-    this.updateVideoBlend(0);
+    this.updateVideoBlend(this.calculateAcousticState().quietFactor);
+  }
+
+  leave() {
+    this.pauseAudio();
+    this.videoNoisy?.pause();
+    this.videoQuiet?.pause();
   }
 
   updateVideoBlend(quietFactor = 0) {

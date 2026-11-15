@@ -116,6 +116,7 @@ export class SearchController {
       if (!resp.ok) return;
 
       const data = await resp.json();
+      if (this.input.value.trim() !== query) return;
       const remoteMatches = data.map((item) => {
         const parts = item.display_name.split(',');
         const mainTitle = parts[0].trim();
@@ -133,7 +134,7 @@ export class SearchController {
       });
 
       // Merge local and remote without duplicates
-      const seen = new Set(this.currentItems.map((i) => `${i.lat.toFixed(2)},${i.lng.toFixed(2)}`));
+      const seen = new Set(this.currentItems.filter(i => Number.isFinite(i.lat) && Number.isFinite(i.lng)).map(i => `${i.lat.toFixed(2)},${i.lng.toFixed(2)}`));
       const combined = [...this.currentItems];
 
       for (const rm of remoteMatches) {
@@ -228,6 +229,9 @@ export class SearchController {
   }
 
   close() {
+    clearTimeout(this.debounceTimer);
+    this.abortController?.abort();
+    this.currentItems = [];
     this.suggestions.classList.remove('open');
     this.suggestions.innerHTML = '';
     this.selectedIndex = -1;

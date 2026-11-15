@@ -6,17 +6,11 @@ export function initCalmUI() {
 
   document.addEventListener('click', (event) => {
     if (explore?.open && !explore.contains(event.target)) explore.open = false;
-    if (event.target.closest('.explore-panel button')) explore.open = false;
+    if (event.target.closest('.explore-panel > button')) {
+      explore.open = false;
+      if (explore.contains(document.activeElement)) document.getElementById('btn-explore').focus();
+    }
   });
-
-  // Hidden HUD controls should also leave the keyboard tab order in Zen view.
-  const syncZen = () => {
-    const zen = document.body.classList.contains('zen-mode');
-    document.querySelectorAll('.hud-capsule').forEach((panel) => { panel.inert = zen; });
-    if (zen) document.getElementById('btn-exit-zen')?.focus({ preventScroll: true });
-    else if (document.activeElement.id === 'btn-exit-zen') document.getElementById('btn-hide-ui')?.focus({ preventScroll: true });
-  };
-  new MutationObserver(syncZen).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   const dialogs = [...document.querySelectorAll('.modal-backdrop')];
   const returnFocus = new WeakMap();
@@ -63,6 +57,10 @@ export function initCalmUI() {
     if (explore?.open) {
       explore.open = false;
       document.getElementById('btn-explore')?.focus();
+    } else if (document.getElementById('rain-readout').open) {
+      const reading = document.getElementById('rain-readout');
+      reading.open = false;
+      reading.querySelector('summary').focus();
     } else if (mixer?.classList.contains('mobile-open')) {
       mixer.classList.remove('mobile-open');
       mixerButton?.setAttribute('aria-expanded', 'false');
