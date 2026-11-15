@@ -41,9 +41,9 @@ export const ARCADE_GAMES = [
     tag: '5-Lane Runner · Subway Surfers Style',
     icon: '🏙️',
     nasaData: 'NASA ECOSTRESS Land Surface Temp',
-    desc: 'Dash through 5 urban lanes on an electric scooter. Dodge boiling asphalt rifts, jump road barriers, slide under steam pipes, and chain shaded tree canopies.',
+    desc: 'Infinite 5-lane subway runner accelerating relentlessly. Snap lanes, jump heat rifts, slide under steam vents, and equip high-tier cosmetics & 24K Golden Crown!',
     accent: '#f97316',
-    objective: 'Dash 1,000 meters across 5 subway-style urban traffic lanes to reach Central Park. Snap between the 5 lanes to dodge scorching heat rifts and stalled delivery vans, jump over boiling asphalt cracks, slide under steam vents, and collect hydration droplets.',
+    objective: 'Survive endlessly across 5 subway-style urban traffic lanes. As speed accelerates infinitely, snap between lanes to dodge scorching heat rifts and stalled vans, jump boiling asphalt cracks, slide under steam vents, chain shaded canopies, and reach 500m milestones!',
     controls: [
       { key: 'A / D or ← / →', desc: 'Snap Between 5 Lanes' },
       { key: 'W / ↑ / Space', desc: 'Jump Over Road Hazards' },
@@ -59,12 +59,12 @@ export const ARCADE_GAMES = [
     tag: 'Atmospheric Arcade',
     icon: '☁️',
     nasaData: 'NASA OMI SO₂/NO₂ & GPM',
-    desc: 'Fly as a nimblest cloud through clean air channels while avoiding industrial trace gas pollution plumes.',
+    desc: 'Endless atmospheric flight through industrial corridors. Dodge toxic SO₂ & NO₂ plumes, withstand acid degradation, and deliver clean rain.',
     accent: '#818cf8',
-    objective: 'Fly through high-altitude clean air corridors while dodging toxic sulfur dioxide (SO₂) and nitrogen dioxide (NO₂) plumes emitted by industrial valleys to deliver pure rain to the mountain community.',
+    objective: 'Fly endlessly as an atmospheric cloud through high-altitude clean air corridors while dodging toxic sulfur dioxide (SO₂) and nitrogen dioxide (NO₂) plumes. As wind accelerates, clear endless smokestack gates and collect pure vapor drops to maintain purity!',
     controls: [
-      { key: 'W / S or ↑ / ↓', desc: 'Ascend / Descend' },
-      { key: 'Space', desc: 'Thermal Lift Glide' }
+      { key: 'Space / W / ↑', desc: 'Ascend & Flap' },
+      { key: 'Gravity', desc: 'Natural Aerodynamic Glide' }
     ],
     environmentalImpact: 'Incorporates NASA Aura OMI tropospheric air quality satellite measurements. Clean air corridors demonstrate how reducing factory emissions and vehicular pollutants prevents acid rain and protects human respiratory health.'
   },
@@ -91,12 +91,14 @@ export const ARCADE_GAMES = [
     tag: 'Underwater Side-Scroller',
     icon: '🪸',
     nasaData: 'NOAA Coral Reef Watch Bleaching Stress',
-    desc: 'Swim as a resilient sea turtle navigating vibrant barrier reefs and seeking cooling ocean upwellings.',
+    desc: 'High-octane underwater survival runner. Dodge full-screen jagged corals, evade lunging reef sharks and barracudas, hydro-dash, and revive bleached reefs.',
     accent: '#f43f5e',
-    objective: 'Swim as an agile sea turtle along a stressed barrier reef. Seek cold-water upwelling thermal currents to revive bleached coral polyps along your 1,200m journey to the Marine Sanctuary.',
+    objective: 'Survive an intense, endless barrier reef packed with jagged seafloor and ceiling corals, hungry reef sharks, and aggressive barracudas. Dash, dive-bomb, and brake to evade lunging predators while seeking cold-water upwellings to revive bleached corals and heal your turtle!',
     controls: [
       { key: 'Space / ↑ / W', desc: 'Paddle Upward' },
-      { key: '↓ / S', desc: 'Dive Deeper' }
+      { key: 'S / ↓', desc: 'Fast Dive-Bomb (Evade Predators & Ceiling Corals)' },
+      { key: 'D / Shift / →', desc: 'Hydro-Dash Jet (Invulnerable Burst)' },
+      { key: 'A / ←', desc: 'Brake & Hover (Time Gaps)' }
     ],
     environmentalImpact: 'Incorporates NOAA Coral Reef Watch 5km satellite sea surface temperature anomaly metrics. Deep cold-water upwellings provide critical thermal refugia that rescue fragile reef ecosystems from devastating marine heatwaves.'
   },
@@ -259,45 +261,103 @@ export class ArcadeHub {
                 </div>
               </div>
 
-              <!-- Scooter Paint Customization -->
+              <!-- Scooter Paint & Gradient Customization -->
               <div class="shop-category">
-                <h4>🛴 Heat Escape Scooter Finishes</h4>
+                <h4>🛴 Heat Escape Scooter Finishes &amp; Holographic Skins</h4>
                 <div class="shop-items-row">
-                  ${COSMETICS_CATALOG.carPaints.map(item => `
-                    <div class="shop-item ${profile.unlocked.carPaints.includes(item.id) ? 'unlocked' : ''} ${profile.equipped.carPaint === item.id ? 'equipped' : ''}" data-cat="carPaints" data-id="${item.id}" data-cost="${item.cost}">
-                      <div class="color-swatch" style="background: ${item.hex};"></div>
-                      <span class="shop-item-name">${item.name}</span>
-                      <span class="shop-item-cost">${profile.unlocked.carPaints.includes(item.id) ? (profile.equipped.carPaint === item.id ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
-                    </div>
-                  `).join('')}
+                  ${COSMETICS_CATALOG.carPaints.map(item => {
+                    const isUnlocked = (profile.unlocked.carPaints || []).includes(item.id);
+                    const isEquipped = profile.equipped.carPaint === item.id;
+                    let swatchStyle = `background: ${item.hex};`;
+                    if (item.type === 'gradient' && item.colors) {
+                      swatchStyle = `background: linear-gradient(135deg, ${item.colors.join(', ')});`;
+                    } else if (item.type === 'crown' || item.hasCrown) {
+                      swatchStyle = `background: linear-gradient(135deg, #ffd700, #b45309); box-shadow: 0 0 10px rgba(255, 215, 0, 0.7);`;
+                    } else if (item.type === 'textured') {
+                      if (item.pattern === 'carbon') {
+                        swatchStyle = `background: repeating-linear-gradient(45deg, #1e293b, #1e293b 3px, #0f172a 3px, #0f172a 6px); border: 1px solid #38bdf8;`;
+                      } else {
+                        swatchStyle = `background: repeating-linear-gradient(45deg, #7f1d1d, #7f1d1d 3px, #dc2626 3px, #f97316 6px); border: 1px solid #f97316;`;
+                      }
+                    }
+                    return `
+                      <div class="shop-item ${isUnlocked ? 'unlocked' : ''} ${isEquipped ? 'equipped' : ''}" data-cat="carPaints" data-id="${item.id}" data-cost="${item.cost}">
+                        <div class="color-swatch" style="${swatchStyle}"></div>
+                        <span class="shop-item-name">${item.name}</span>
+                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
+                      </div>
+                    `;
+                  }).join('')}
                 </div>
               </div>
 
-              <!-- Cloud Glider Customization -->
+              <!-- Royal Crowns & Headgear Customization -->
               <div class="shop-category">
-                <h4>🕊️ Cloud Glider Wings</h4>
+                <h4>👑 Royal Crowns &amp; Headgear Accessories</h4>
                 <div class="shop-items-row">
-                  ${COSMETICS_CATALOG.gliderSkins.map(item => `
-                    <div class="shop-item ${profile.unlocked.gliderSkins.includes(item.id) ? 'unlocked' : ''} ${profile.equipped.gliderSkin === item.id ? 'equipped' : ''}" data-cat="gliderSkins" data-id="${item.id}" data-cost="${item.cost}">
-                      <div class="color-swatch" style="background: ${item.hex};"></div>
-                      <span class="shop-item-name">${item.name}</span>
-                      <span class="shop-item-cost">${profile.unlocked.gliderSkins.includes(item.id) ? (profile.equipped.gliderSkin === item.id ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
-                    </div>
-                  `).join('')}
+                  ${(COSMETICS_CATALOG.crowns || []).map(item => {
+                    const isUnlocked = (profile.unlocked.crowns || ['none']).includes(item.id);
+                    const isEquipped = (profile.equipped.crown || 'none') === item.id;
+                    let swatchStyle = `background: ${item.hex};`;
+                    if (item.id === 'golden_crown') {
+                      swatchStyle = `background: linear-gradient(135deg, #ffd700, #b45309); box-shadow: 0 0 12px rgba(255, 215, 0, 0.85);`;
+                    } else if (item.id === 'cyber_halo') {
+                      swatchStyle = `background: radial-gradient(circle, #0c0e18 40%, #38bdf8 70%); box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);`;
+                    } else if (item.id === 'phoenix_crest') {
+                      swatchStyle = `background: linear-gradient(135deg, #f97316, #ef4444); box-shadow: 0 0 10px rgba(249, 115, 22, 0.8);`;
+                    }
+                    return `
+                      <div class="shop-item ${isUnlocked ? 'unlocked' : ''} ${isEquipped ? 'equipped' : ''}" data-cat="crowns" data-id="${item.id}" data-cost="${item.cost}">
+                        <div class="color-swatch" style="${swatchStyle}"></div>
+                        <span class="shop-item-name">${item.name}</span>
+                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
+                      </div>
+                    `;
+                  }).join('')}
+                </div>
+              </div>
+
+              <!-- Cloud Glider & Atmospheric Skins -->
+              <div class="shop-category">
+                <h4>☁️ Cloud Courier &amp; Atmospheric Skins</h4>
+                <div class="shop-items-row">
+                  ${COSMETICS_CATALOG.gliderSkins.map(item => {
+                    const isUnlocked = (profile.unlocked.gliderSkins || []).includes(item.id);
+                    const isEquipped = profile.equipped.gliderSkin === item.id;
+                    let swatchStyle = `background: ${item.hex};`;
+                    if (item.type === 'gradient' && item.colors) {
+                      swatchStyle = `background: linear-gradient(135deg, ${item.colors.join(', ')});`;
+                    }
+                    return `
+                      <div class="shop-item ${isUnlocked ? 'unlocked' : ''} ${isEquipped ? 'equipped' : ''}" data-cat="gliderSkins" data-id="${item.id}" data-cost="${item.cost}">
+                        <div class="color-swatch" style="${swatchStyle}"></div>
+                        <span class="shop-item-name">${item.name}</span>
+                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
+                      </div>
+                    `;
+                  }).join('')}
                 </div>
               </div>
 
               <!-- Fireline Spirit Glow Customization -->
               <div class="shop-category">
-                <h4>✨ Fireline Spirit Glow</h4>
+                <h4>✨ Spirit Glow &amp; Auras</h4>
                 <div class="shop-items-row">
-                  ${COSMETICS_CATALOG.spiritGlows.map(item => `
-                    <div class="shop-item ${profile.unlocked.spiritGlows.includes(item.id) ? 'unlocked' : ''} ${profile.equipped.spiritGlow === item.id ? 'equipped' : ''}" data-cat="spiritGlows" data-id="${item.id}" data-cost="${item.cost}">
-                      <div class="color-swatch" style="background: ${item.hex};"></div>
-                      <span class="shop-item-name">${item.name}</span>
-                      <span class="shop-item-cost">${profile.unlocked.spiritGlows.includes(item.id) ? (profile.equipped.spiritGlow === item.id ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
-                    </div>
-                  `).join('')}
+                  ${COSMETICS_CATALOG.spiritGlows.map(item => {
+                    const isUnlocked = (profile.unlocked.spiritGlows || []).includes(item.id);
+                    const isEquipped = profile.equipped.spiritGlow === item.id;
+                    let swatchStyle = `background: ${item.hex};`;
+                    if (item.type === 'gradient' && item.colors) {
+                      swatchStyle = `background: linear-gradient(135deg, ${item.colors.join(', ')});`;
+                    }
+                    return `
+                      <div class="shop-item ${isUnlocked ? 'unlocked' : ''} ${isEquipped ? 'equipped' : ''}" data-cat="spiritGlows" data-id="${item.id}" data-cost="${item.cost}">
+                        <div class="color-swatch" style="${swatchStyle}"></div>
+                        <span class="shop-item-name">${item.name}</span>
+                        <span class="shop-item-cost">${isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${item.cost} 🪙`}</span>
+                      </div>
+                    `;
+                  }).join('')}
                 </div>
               </div>
 
@@ -441,10 +501,12 @@ export class ArcadeHub {
       const cost = parseInt(itemEl.getAttribute('data-cost'), 10);
 
       let catKey = 'carPaint';
+      if (cat === 'crowns') catKey = 'crown';
       if (cat === 'gliderSkins') catKey = 'gliderSkin';
       if (cat === 'spiritGlows') catKey = 'spiritGlow';
 
-      if (arcadeTokens.profile.unlocked[cat].includes(id)) {
+      const unlockedList = arcadeTokens.profile.unlocked[cat] || (cat === 'crowns' ? ['none'] : ['cyan']);
+      if (unlockedList.includes(id)) {
         arcadeTokens.equipCosmetic(catKey, id);
         this.updateShopModal();
       } else {
@@ -470,12 +532,14 @@ export class ArcadeHub {
     modal.querySelectorAll('.shop-item').forEach(itemEl => {
       const cat = itemEl.getAttribute('data-cat');
       const id = itemEl.getAttribute('data-id');
-      const isUnlocked = p.unlocked[cat].includes(id);
+      const unlockedList = p.unlocked[cat] || (cat === 'crowns' ? ['none'] : ['cyan']);
+      const isUnlocked = unlockedList.includes(id);
 
       let catKey = 'carPaint';
+      if (cat === 'crowns') catKey = 'crown';
       if (cat === 'gliderSkins') catKey = 'gliderSkin';
       if (cat === 'spiritGlows') catKey = 'spiritGlow';
-      const isEquipped = p.equipped[catKey] === id;
+      const isEquipped = (p.equipped[catKey] || (catKey === 'crown' ? 'none' : 'cyan')) === id;
 
       itemEl.classList.toggle('unlocked', isUnlocked);
       itemEl.classList.toggle('equipped', isEquipped);
