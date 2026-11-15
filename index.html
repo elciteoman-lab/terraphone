@@ -10,10 +10,10 @@
   <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/dist/maplibre-gl.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/dist/maplibre-gl.js"></script>
 
-  <!-- Google Fonts: Inter -->
+  <!-- Google Fonts: Space Apps Brand Fonts (Fira Sans, Overpass) & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@600;700;800;900&family=Overpass:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Error Diagnostic Reporter -->
   <script>
@@ -42,20 +42,33 @@
   </div>
 
   <!-- ==========================================
-       TOP LEFT: BRAND & NASA SVS 5650 CAPSULE
+       TOP LEFT: BRAND, SPACE APPS & NASA SVS CAPSULE
        ========================================== -->
   <header class="hud-capsule" id="hud-top-left">
-    <div class="brand-wrapper" id="btn-brand" title="Terraphone — NASA Space Apps Challenge">
+    <div class="brand-wrapper" id="btn-brand" title="Terraphone — NASA International Space Apps Challenge">
+      <!-- Official NASA Space Apps Challenge Orbit Icon Motif -->
+      <svg class="space-apps-orbit-icon" width="22" height="22" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <!-- Planetary Orbit Ring -->
+        <ellipse cx="16" cy="16" rx="13" ry="5.5" transform="rotate(-28 16 16)" stroke="#E7F434" stroke-width="2.2" stroke-dasharray="72 14" opacity="0.95"/>
+        <!-- Central Deep Space Sphere -->
+        <circle cx="16" cy="16" r="4.2" fill="#1B2B85" stroke="#E7F434" stroke-width="1.8"/>
+        <!-- Orbiting Satellite Node -->
+        <circle cx="26" cy="10.5" r="2.4" fill="#E7F434"/>
+      </svg>
       <span class="brand-title">Terra<span>phone</span></span>
     </div>
+    <a href="https://www.spaceappschallenge.org" target="_blank" rel="noopener noreferrer" class="badge-space-apps" title="Official NASA International Space Apps Challenge">
+      <span class="space-apps-dot"></span>
+      <span>Space Apps</span>
+    </a>
     <a href="https://svs.gsfc.nasa.gov/5650" target="_blank" rel="noopener noreferrer" class="badge-gpm" title="NASA SVS 5650: Near Real-Time Global Precipitation from the GPM Constellation">
       <span id="connection-dot" class="dot"></span>
-      <span>NASA SVS 5650</span>
+      <span>SVS 5650</span>
     </a>
   </header>
 
   <!-- ==========================================
-       TOP CENTER: SLEEK SEARCHBAR CAPSULE
+       BOTTOM CENTER: SLEEK SEARCHBAR CAPSULE
        ========================================== -->
   <div class="hud-capsule" id="hud-top-center">
     <div class="search-container">

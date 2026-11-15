@@ -48,13 +48,25 @@ export class SoundOfChangeEngine {
 
     // DOM Elements Cache
     this.container = null;
-    this.videoNoisy = null;
-    this.videoQuiet = null;
     this.indexNumberEl = null;
     this.indexBadgeEl = null;
     this.indexDiffEl = null;
     this.activeCountEl = null;
     this.perspectiveLabelEl = null;
+
+    // CAVA Audio Spectrum Visualizer
+    this.analyser = null;
+    this.cavaCanvas = null;
+    this.cavaCtx = null;
+    this.cavaBars = 64;
+    this.cavaBarValues = new Float32Array(64);
+    this.cavaPeakValues = new Float32Array(64);
+    this.cavaPeakHolds = new Int32Array(64);
+    this.cavaPeakVels = new Float32Array(64);
+    this.cavaDataArray = null;
+    this.cavaRafId = null;
+    this.cavaResizeObserver = null;
+    this.cavaStatusEl = null;
 
     // Animation / RAF
     this.rafId = null;
@@ -70,7 +82,7 @@ export class SoundOfChangeEngine {
     this.renderLayout();
     this.cacheDomElements();
     this.bindEvents();
-    this.initVideo();
+    this.initVisualizer();
     this.updateSimulation();
   }
 
@@ -79,34 +91,12 @@ export class SoundOfChangeEngine {
    */
   renderLayout() {
     this.container.innerHTML = `
-      <!-- Google Flow Video Background Viewport -->
-      <div class="soc-video-viewport" id="soc-video-viewport">
-        <video id="soc-video-noisy" class="soc-video soc-video-noisy" autoplay loop muted playsinline preload="auto" poster="img/busy_street_preview.jpg">
-          <source src="videos/noisy-city.mp4" type="video/mp4">
-          <source src="People_walking_on_busy_street_e5d487d8_1080p.mp4" type="video/mp4">
-        </video>
-        <video id="soc-video-quiet" class="soc-video soc-video-quiet" autoplay loop muted playsinline preload="auto" poster="img/manhattan_street_preview.jpg">
-          <source src="videos/quiet-city.mp4" type="video/mp4">
-          <source src="People_walking_on_Manhattan_street_3a44dd46_1080p.mp4" type="video/mp4">
-        </video>
-        
-        <!-- Environmental Overlays -->
+      <!-- Space Apps Ambient Cosmic Backdrop & Environmental Overlays -->
+      <div class="soc-backdrop" id="soc-backdrop">
         <div class="soc-overlay soc-overlay-vignette"></div>
         <div class="soc-overlay soc-overlay-green" id="soc-overlay-green"></div>
         <div class="soc-overlay soc-overlay-barrier" id="soc-overlay-barrier"></div>
         <div class="soc-overlay soc-overlay-calm" id="soc-overlay-calm"></div>
-
-        <!-- Before/After Split Line (Interactive Slider) -->
-        <div class="soc-split-container" id="soc-split-container" style="display: none;">
-          <div class="soc-split-line" id="soc-split-line">
-            <div class="soc-split-handle" title="Drag to compare Noisy vs Quiet">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
-            </div>
-          </div>
-          <div class="soc-split-badge left">BASELINE NOISY</div>
-          <div class="soc-split-badge right">AFTER INTERVENTIONS</div>
-        </div>
       </div>
 
       <!-- Main Interactive Interface Layer -->
@@ -186,7 +176,6 @@ export class SoundOfChangeEngine {
           <div class="soc-subbar-right">
             <button id="soc-btn-apply-all" class="soc-chip-btn" title="Activate all 20 interventions">⚡ Apply All</button>
             <button id="soc-btn-reset" class="soc-chip-btn" title="Reset all to initial noisy city">🔄 Reset All</button>
-            <button id="soc-btn-split-toggle" class="soc-chip-btn" title="Toggle interactive split slider view">✂️ Split View</button>
           </div>
         </div>
 
@@ -258,6 +247,32 @@ export class SoundOfChangeEngine {
             `).join('')}
           </div>
         </main>
+
+        <!-- CAVA Audio Spectrum Visualizer Dock -->
+        <div class="soc-cava-dock" id="soc-cava-dock">
+          <div class="soc-cava-header">
+            <div class="soc-cava-title-wrap">
+              <span class="soc-cava-pulse"></span>
+              <span class="soc-cava-title">CAVA SPECTRUM ANALYZER</span>
+              <span class="soc-cava-tag">NASA S2L MODEL</span>
+            </div>
+            <div class="soc-cava-bands-legend">
+              <span class="cava-band-tag"><span class="cava-band-dot" style="background: #1B2B85;"></span>20-120Hz Sub</span>
+              <span class="cava-band-dot-divider">·</span>
+              <span class="cava-band-tag"><span class="cava-band-dot" style="background: #0284c7;"></span>Traffic &amp; Engine</span>
+              <span class="cava-band-dot-divider">·</span>
+              <span class="cava-band-tag"><span class="cava-band-dot" style="background: #10b981;"></span>Horns &amp; Sirens</span>
+              <span class="cava-band-dot-divider">·</span>
+              <span class="cava-band-tag"><span class="cava-band-dot" style="background: #E7F434;"></span>Nature &amp; Highs</span>
+            </div>
+            <div class="soc-cava-meta">
+              <span id="soc-cava-status">64 BARS · 20Hz - 16kHz · REAL-TIME FFT</span>
+            </div>
+          </div>
+          <div class="soc-cava-canvas-wrap">
+            <canvas id="soc-cava-canvas" class="soc-cava-canvas" height="84"></canvas>
+          </div>
+        </div>
 
         <!-- Slide-Out 5-Channel Audio Mixer Drawer -->
         <aside class="soc-mixer-drawer" id="soc-mixer-drawer">
@@ -366,8 +381,6 @@ export class SoundOfChangeEngine {
   }
 
   cacheDomElements() {
-    this.videoNoisy = document.getElementById('soc-video-noisy');
-    this.videoQuiet = document.getElementById('soc-video-quiet');
     this.indexNumberEl = document.getElementById('soc-index-num');
     this.indexBadgeEl = document.getElementById('soc-index-badge');
     this.indexBarFillEl = document.getElementById('soc-index-bar-fill');
@@ -379,8 +392,9 @@ export class SoundOfChangeEngine {
     this.overlayBarrier = document.getElementById('soc-overlay-barrier');
     this.overlayCalm = document.getElementById('soc-overlay-calm');
     this.mixerDrawer = document.getElementById('soc-mixer-drawer');
-    this.splitContainer = document.getElementById('soc-split-container');
-    this.splitLine = document.getElementById('soc-split-line');
+    this.cavaCanvas = document.getElementById('soc-cava-canvas');
+    this.cavaCtx = this.cavaCanvas ? this.cavaCanvas.getContext('2d') : null;
+    this.cavaStatusEl = document.getElementById('soc-cava-status');
   }
 
   bindEvents() {
@@ -503,58 +517,7 @@ export class SoundOfChangeEngine {
       });
     }
 
-    // 7. Split View Toggle
-    const btnSplit = document.getElementById('soc-btn-split-toggle');
-    if (btnSplit) {
-      btnSplit.addEventListener('click', () => {
-        this.isSplitModeActive = !this.isSplitModeActive;
-        if (this.splitContainer) {
-          this.splitContainer.style.display = this.isSplitModeActive ? 'block' : 'none';
-        }
-        btnSplit.classList.toggle('active', this.isSplitModeActive);
-        this.updateVideoBlend();
-      });
-    }
-
-    // Interactive Split Slider dragging
-    if (this.splitContainer) {
-      let isDragging = false;
-      const updateSplitFromX = (clientX) => {
-        const rect = this.splitContainer.getBoundingClientRect();
-        const pos = Math.max(0.05, Math.min(0.95, (clientX - rect.left) / rect.width));
-        this.splitSliderPosition = pos;
-        if (this.splitLine) this.splitLine.style.left = `${pos * 100}%`;
-        this.updateVideoBlend();
-      };
-
-      this.splitContainer.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        updateSplitFromX(e.clientX);
-      });
-      window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        updateSplitFromX(e.clientX);
-      });
-      window.addEventListener('mouseup', () => {
-        isDragging = false;
-      });
-      // Touch support
-      this.splitContainer.addEventListener('touchstart', (e) => {
-        if (e.touches.length > 0) {
-          isDragging = true;
-          updateSplitFromX(e.touches[0].clientX);
-        }
-      }, { passive: true });
-      window.addEventListener('touchmove', (e) => {
-        if (!isDragging || e.touches.length === 0) return;
-        updateSplitFromX(e.touches[0].clientX);
-      }, { passive: true });
-      window.addEventListener('touchend', () => {
-        isDragging = false;
-      });
-    }
-
-    // 8. Mixer Drawer Toggle & Close
+    // 7. Mixer Drawer Toggle & Close
     const btnMixerToggle = document.getElementById('soc-btn-mixer-toggle');
     const btnCloseMixer = document.getElementById('soc-btn-close-mixer');
     if (btnMixerToggle && this.mixerDrawer) {
@@ -836,64 +799,203 @@ export class SoundOfChangeEngine {
       this.overlayCalm.style.opacity = calmAlpha;
     }
 
-    // 7. Update Video Blend
-    this.updateVideoBlend(state.quietFactor);
-
-    // 8. Update Web Audio Engine
+    // 7. Update Web Audio Engine
     this.applyAudioState(state);
   }
 
-  /**
-   * Video crossfade coordination between Noisy and Quiet Google Flow footage
-   */
-  initVideo() {
-    if (this.videoNoisy) {
-      this.videoNoisy.play().catch(e => console.log('[SOC] Video play prevented:', e));
+  // ==========================================
+  // CAVA AUDIO SPECTRUM VISUALIZER ENGINE
+  // ==========================================
+
+  initVisualizer() {
+    this.cavaCanvas = document.getElementById('soc-cava-canvas');
+    if (!this.cavaCanvas) return;
+    this.cavaCtx = this.cavaCanvas.getContext('2d');
+
+    const updateSize = () => {
+      if (!this.cavaCanvas) return;
+      const wrap = this.cavaCanvas.parentElement;
+      if (!wrap) return;
+      const rect = wrap.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const targetW = Math.max(300, Math.floor(rect.width * dpr));
+      const targetH = Math.max(60, Math.floor(rect.height * dpr));
+
+      if (this.cavaCanvas.width !== targetW || this.cavaCanvas.height !== targetH) {
+        this.cavaCanvas.width = targetW;
+        this.cavaCanvas.height = targetH;
+      }
+    };
+
+    updateSize();
+
+    if (window.ResizeObserver) {
+      if (this.cavaResizeObserver) this.cavaResizeObserver.disconnect();
+      this.cavaResizeObserver = new ResizeObserver(() => updateSize());
+      const wrap = this.cavaCanvas.parentElement;
+      if (wrap) this.cavaResizeObserver.observe(wrap);
     }
-    if (this.videoQuiet) {
-      this.videoQuiet.play().catch(e => console.log('[SOC] Video play prevented:', e));
+
+    // Connect audio analyser if AudioContext and masterGain are ready
+    if (this.audioCtx && this.masterGain && !this.analyser) {
+      this.analyser = this.audioCtx.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.65;
+      this.masterGain.connect(this.analyser);
+      this.cavaDataArray = new Uint8Array(this.analyser.frequencyBinCount);
     }
-    this.updateVideoBlend(0);
+
+    this.startCavaLoop();
   }
 
-  updateVideoBlend(quietFactor = 0) {
-    if (!this.videoNoisy || !this.videoQuiet) return;
+  initVideo() {
+    // Backwards-compatible alias for previous video hook
+    this.initVisualizer();
+  }
 
-    if (this.isSplitModeActive) {
-      // Split view mode: both videos visible side-by-side cleanly clipped
-      this.videoNoisy.style.display = 'block';
-      this.videoQuiet.style.display = 'block';
-      this.videoNoisy.style.visibility = 'visible';
-      this.videoQuiet.style.visibility = 'visible';
-      const pct = this.splitSliderPosition * 100;
-      this.videoNoisy.style.clipPath = `polygon(0% 0%, ${pct}% 0%, ${pct}% 100%, 0% 100%)`;
-      this.videoQuiet.style.clipPath = `polygon(${pct}% 0%, 100% 0%, 100% 100%, ${pct}% 100%)`;
-      this.videoNoisy.style.opacity = '1';
-      this.videoQuiet.style.opacity = '1';
-    } else {
-      // Normal single-viewport mode: NEVER alpha-blend two live pedestrian clips!
-      this.videoNoisy.style.clipPath = 'none';
-      this.videoQuiet.style.clipPath = 'none';
+  updateVideoBlend() {
+    // No-op compatibility stub (video removed in favor of CAVA visualizer)
+  }
 
-      // If quietFactor >= 0.40 and not in baseline before-mode, show Quiet city; otherwise show Noisy city
-      const showQuiet = !this.isBeforeMode && quietFactor >= 0.40;
+  startCavaLoop() {
+    if (this.cavaRafId) {
+      cancelAnimationFrame(this.cavaRafId);
+      this.cavaRafId = null;
+    }
 
-      if (showQuiet) {
-        this.videoQuiet.style.display = 'block';
-        this.videoQuiet.style.visibility = 'visible';
-        this.videoQuiet.style.opacity = '1';
+    let lastTime = performance.now();
 
-        this.videoNoisy.style.opacity = '0';
-        this.videoNoisy.style.visibility = 'hidden';
-        this.videoNoisy.style.display = 'none';
+    const loop = (time) => {
+      const dt = Math.min(0.08, (time - lastTime) / 1000);
+      lastTime = time;
+
+      this.renderCavaFrame(dt, time);
+      this.cavaRafId = requestAnimationFrame(loop);
+    };
+
+    this.cavaRafId = requestAnimationFrame(loop);
+  }
+
+  renderCavaFrame(dt, time) {
+    if (!this.cavaCanvas || !this.cavaCtx) return;
+    const ctx = this.cavaCtx;
+    const w = this.cavaCanvas.width;
+    const h = this.cavaCanvas.height;
+    if (w <= 0 || h <= 0) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // Clear frame
+    ctx.clearRect(0, 0, w, h);
+
+    const isLive = this.isPlaying && this.analyser && this.cavaDataArray;
+    if (isLive) {
+      this.analyser.getByteFrequencyData(this.cavaDataArray);
+    }
+
+    const barCount = this.cavaBars; // 64 bars
+    const binCount = this.cavaDataArray ? this.cavaDataArray.length : 128; // 128 bins
+
+    // Update CAVA physics for all 64 frequency bars
+    for (let i = 0; i < barCount; i++) {
+      let rawVal = 0;
+
+      if (isLive) {
+        // Logarithmic frequency bin distribution across the audible spectrum (20Hz - 16kHz)
+        // Humans perceive pitch logarithmically; this gives high resolution to bass/mids
+        const normIdx = i / (barCount - 1);
+        const logMin = Math.log10(1);
+        const logMax = Math.log10(binCount - 1);
+        const logBin = Math.pow(10, logMin + normIdx * (logMax - logMin));
+        const lowBin = Math.max(0, Math.min(binCount - 1, Math.floor(logBin)));
+        const highBin = Math.max(0, Math.min(binCount - 1, Math.ceil(logBin)));
+        const frac = logBin - lowBin;
+
+        const sample = (this.cavaDataArray[lowBin] * (1 - frac) + this.cavaDataArray[highBin] * frac) / 255;
+        // Equal loudness curve compensation: mild boost for higher frequencies
+        const eqBoost = 1.0 + normIdx * 0.85;
+        rawVal = Math.min(1.0, sample * eqBoost);
       } else {
-        this.videoNoisy.style.display = 'block';
-        this.videoNoisy.style.visibility = 'visible';
-        this.videoNoisy.style.opacity = '1';
+        // Ambient breathing motion wave when soundscape is idle
+        const wave1 = Math.sin(time * 0.0022 + i * 0.16) * 0.07;
+        const wave2 = Math.cos(time * 0.0035 - i * 0.11) * 0.04;
+        const baseline = 0.04 + Math.sin(i * 0.09) * 0.02;
+        rawVal = Math.max(0.015, baseline + wave1 + wave2);
+      }
 
-        this.videoQuiet.style.opacity = '0';
-        this.videoQuiet.style.visibility = 'hidden';
-        this.videoQuiet.style.display = 'none';
+      // Fast attack vs smooth gravity decay
+      if (rawVal > this.cavaBarValues[i]) {
+        // Instant attack for live punchy dynamics
+        this.cavaBarValues[i] = this.cavaBarValues[i] * 0.25 + rawVal * 0.75;
+      } else {
+        // Gravity falloff
+        const falloffSpeed = 1.75; // falloff rate per second
+        this.cavaBarValues[i] = Math.max(0, this.cavaBarValues[i] - falloffSpeed * dt);
+      }
+
+      // Floating Peak Cap Physics (Signature CAVA terminal feature)
+      if (this.cavaBarValues[i] >= this.cavaPeakValues[i]) {
+        this.cavaPeakValues[i] = this.cavaBarValues[i];
+        this.cavaPeakHolds[i] = 12; // Hold frames at peak before accelerating down
+        this.cavaPeakVels[i] = 0;
+      } else {
+        if (this.cavaPeakHolds[i] > 0) {
+          this.cavaPeakHolds[i]--;
+        } else {
+          this.cavaPeakVels[i] += 4.5 * dt; // Gravity acceleration
+          this.cavaPeakValues[i] = Math.max(0, this.cavaPeakValues[i] - this.cavaPeakVels[i] * dt);
+        }
+      }
+    }
+
+    // Geometry calculations
+    const gap = Math.max(2 * dpr, Math.floor(w / (barCount * 10)));
+    const totalGap = gap * (barCount - 1);
+    const barWidth = Math.max(2 * dpr, (w - totalGap) / barCount);
+    const usableHeight = h - 8 * dpr;
+
+    // Official NASA Space Apps Challenge Vertical Palette Gradient:
+    // Deep Space Blue (#1B2B85) -> Sky Blue (#0ea5e9) -> Nature Green (#10b981) -> Fluorescent Yellow (#E7F434)
+    const barGradient = ctx.createLinearGradient(0, h, 0, 0);
+    barGradient.addColorStop(0.00, 'rgba(27, 43, 133, 0.95)');  // Deep Space Blue
+    barGradient.addColorStop(0.35, 'rgba(14, 165, 233, 0.95)'); // Atmospheric Sky
+    barGradient.addColorStop(0.70, 'rgba(16, 185, 129, 0.95)'); // Calming Emerald
+    barGradient.addColorStop(0.96, 'rgba(231, 244, 52, 1.00)');  // Space Apps Neon Yellow
+
+    ctx.fillStyle = barGradient;
+
+    // Draw CAVA vertical frequency bars
+    for (let i = 0; i < barCount; i++) {
+      const x = i * (barWidth + gap);
+      const val = this.cavaBarValues[i];
+      const barH = Math.max(2.5 * dpr, val * usableHeight);
+      const y = h - barH;
+      const corner = Math.min(barWidth / 2, 2.5 * dpr);
+
+      ctx.beginPath();
+      if (ctx.roundRect) {
+        ctx.roundRect(x, y, barWidth, barH, [corner, corner, 0, 0]);
+      } else {
+        ctx.rect(x, y, barWidth, barH);
+      }
+      ctx.fill();
+
+      // Draw Floating Peak Cap Marker
+      const peakVal = this.cavaPeakValues[i];
+      if (peakVal > 0.02) {
+        const peakY = Math.max(1 * dpr, h - peakVal * usableHeight - 3 * dpr);
+        ctx.save();
+        ctx.fillStyle = '#E7F434'; // Space Apps Fluorescent Yellow
+        ctx.shadowColor = 'rgba(231, 244, 52, 0.75)';
+        ctx.shadowBlur = 5 * dpr;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(x, peakY, barWidth, 2.2 * dpr, [1 * dpr]);
+        } else {
+          ctx.rect(x, peakY, barWidth, 2.2 * dpr);
+        }
+        ctx.fill();
+        ctx.restore();
       }
     }
   }
@@ -919,6 +1021,15 @@ export class SoundOfChangeEngine {
     this.masterGain = this.audioCtx.createGain();
     this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : this.masterVolume, now);
     this.masterGain.connect(this.audioCtx.destination);
+
+    // CAVA Spectrum Analyser
+    if (!this.analyser) {
+      this.analyser = this.audioCtx.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.65;
+      this.masterGain.connect(this.analyser);
+      this.cavaDataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    }
 
     // Indoor/Outdoor Acoustic Biquad Filter (Simulates building facade sound transmission)
     this.indoorFilter = this.audioCtx.createBiquadFilter();
@@ -1240,6 +1351,14 @@ export class SoundOfChangeEngine {
     if (this.hornTimer) {
       clearInterval(this.hornTimer);
       this.hornTimer = null;
+    }
+    if (this.cavaRafId) {
+      cancelAnimationFrame(this.cavaRafId);
+      this.cavaRafId = null;
+    }
+    if (this.cavaResizeObserver) {
+      this.cavaResizeObserver.disconnect();
+      this.cavaResizeObserver = null;
     }
   }
 }

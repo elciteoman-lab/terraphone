@@ -1749,7 +1749,7 @@ class App {
       if (this.isListening) {
         this.sound.updateRain(0, this.sound.currentZoom, false);
       }
-      this.soundOfChange?.initVideo();
+      this.soundOfChange?.initVisualizer();
 
       if (updateHash) window.history.replaceState(null, '', '#sound-of-change');
     } else if (viewName === 'arcade') {
