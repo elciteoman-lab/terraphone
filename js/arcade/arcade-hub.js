@@ -7,11 +7,9 @@
  */
 
 import { arcadeTokens, COSMETICS_CATALOG } from './arcade-tokens.js';
-import { RainwayGame } from './rainway.js';
 import { FirelineGame } from './fireline.js';
 import {
   HeatEscapeGame,
-  WaterKeeperGame,
   CloudCourierGame,
   OzoneDriftGame,
   CoralCurrentGame,
@@ -19,26 +17,6 @@ import {
 } from './mini-games.js';
 
 export const ARCADE_GAMES = [
-  {
-    id: 'rainway',
-    title: 'Rainway',
-    subtitle: 'The Endless Rain Journey',
-    tag: 'Main Game · 3D Driving',
-    icon: '🌧️',
-    nasaData: 'NASA GPM IMERG Precipitation',
-    desc: 'Slow Roads-inspired scenic driving. Procedural hills, curves, wet asphalt, and the secret Cloud Glider flight mode.',
-    accent: '#38bdf8',
-    objective: 'Traverse 4 continuous NASA weather sectors to reach the Valley Research Station at 2,400m. Hug the asphalt, ride the rolling hills, and leap through floating Cloud Rings at hill crests to deploy your Cloud Glider wings.',
-    controls: [
-      { key: 'W / ↑', desc: 'Accelerate' },
-      { key: 'S / ↓', desc: 'Brake / Reverse' },
-      { key: 'A / D or ← / →', desc: 'Steer Left / Right' },
-      { key: 'Space', desc: 'Handbrake / Air Glider' },
-      { key: 'C', desc: 'Toggle Chase / Hood Camera' },
-      { key: 'P', desc: 'Toggle Autopilot Cruise' }
-    ],
-    environmentalImpact: 'Precipitation dynamically shifts based on real-world NASA GPM IMERG microwave and radar satellite data. Monitoring rainfall rates across diverse terrains is essential for assessing freshwater supplies, flash flood hazards, and watershed health.'
-  },
   {
     id: 'fireline',
     title: 'Fireline',
@@ -59,35 +37,20 @@ export const ARCADE_GAMES = [
   {
     id: 'heat_escape',
     title: 'Heat Escape',
-    subtitle: 'Find the Cool Route',
-    tag: 'Urban Arcade',
+    subtitle: '5-Lane Subway Heat Runner',
+    tag: '5-Lane Runner · Subway Surfers Style',
     icon: '🏙️',
     nasaData: 'NASA ECOSTRESS Land Surface Temp',
-    desc: 'Navigate city heat islands on a scooter. Chain cool shaded park corridors to prevent heat fatigue.',
+    desc: 'Dash through 5 urban lanes on an electric scooter. Dodge boiling asphalt rifts, jump road barriers, slide under steam pipes, and chain shaded tree canopies.',
     accent: '#f97316',
-    objective: 'Cruise on your electric scooter across a sun-scorched city to reach the Central Park Oasis at 1,000m. Slalom through tree canopy shade and hydration misting stations to prevent your hydration meter from dropping to zero.',
+    objective: 'Dash 1,000 meters across 5 subway-style urban traffic lanes to reach Central Park. Snap between the 5 lanes to dodge scorching heat rifts and stalled delivery vans, jump over boiling asphalt cracks, slide under steam vents, and collect hydration droplets.',
     controls: [
-      { key: 'W / S or ↑ / ↓', desc: 'Accelerate / Decelerate' },
-      { key: 'A / D or ← / →', desc: 'Steer & Lane Shift' },
-      { key: 'Space / Shift', desc: 'Electric Turbo Boost' }
+      { key: 'A / D or ← / →', desc: 'Snap Between 5 Lanes' },
+      { key: 'W / ↑ / Space', desc: 'Jump Over Road Hazards' },
+      { key: 'S / ↓', desc: 'Slide Under Steam Vents / Fast Fall' },
+      { key: 'Swipe (Touch)', desc: 'Left / Right / Jump / Slide' }
     ],
     environmentalImpact: 'Driven by NASA ECOSTRESS thermal measurements aboard the ISS. Unshaded asphalt surfaces can exceed 50°C (122°F), whereas tree-shaded parks lower ambient temperatures by up to 12°C, demonstrating the lifesaving power of urban greening.'
-  },
-  {
-    id: 'water_keeper',
-    title: 'Water Keeper',
-    subtitle: 'Flow Through the Landscape',
-    tag: 'Side-Scroller',
-    icon: '💧',
-    nasaData: 'NASA SMAP Soil Moisture Radiometer',
-    desc: 'Guide an agile water droplet across varied soil strata to nourish blooming natural vegetation.',
-    accent: '#06b6d4',
-    objective: 'Guide an agile water droplet across varied soil strata (clay, loam, sand) to irrigate 8 parched soil patches and revive blooming wildflowers before evaporating under the blazing sun.',
-    controls: [
-      { key: 'Space / Click / W', desc: 'Ascend / Fluid Leap' },
-      { key: 'A / D or ← / →', desc: 'Adjust Trajectory' }
-    ],
-    environmentalImpact: 'Powered by NASA SMAP (Soil Moisture Active Passive) radiometer observations. Topsoil moisture regulation directly impacts crop yields, groundwater recharge, and global carbon sequestration in natural grasslands.'
   },
   {
     id: 'cloud_courier',
@@ -266,8 +229,8 @@ export class ArcadeHub {
               <span>✕ Exit Game</span>
             </button>
             <div class="arcade-game-banner" id="arcade-game-banner">
-              <span id="arcade-game-banner-icon">🌧️</span>
-              <span id="arcade-game-banner-title">Rainway</span>
+              <span id="arcade-game-banner-icon">🌲</span>
+              <span id="arcade-game-banner-title">Earth Arcade</span>
             </div>
             <button id="arcade-btn-pause-game" class="arcade-hud-btn" title="Pause / Resume">
               <span>⏸️ Pause</span>
@@ -275,13 +238,6 @@ export class ArcadeHub {
           </div>
 
           <canvas id="arcade-canvas" class="arcade-canvas"></canvas>
-
-          <!-- Autopilot & Easter Egg Toasts -->
-          <div id="rainway-autopilot-indicator" class="arcade-toast autopilot" style="display: none;">🤖 AUTOPILOT ACTIVE</div>
-          <div id="rainway-sign-toast" class="arcade-toast vylt">
-            <span>✨ Easter Egg Discovered!</span>
-            <strong>VYLT × TERRAPHONE Scenic Landmark (+10 Tokens)</strong>
-          </div>
         </div>
 
         <!-- Cosmetic Shop Modal -->
@@ -303,9 +259,9 @@ export class ArcadeHub {
                 </div>
               </div>
 
-              <!-- Car Paint Customization -->
+              <!-- Scooter Paint Customization -->
               <div class="shop-category">
-                <h4>🚗 Rainway Car Paint Colors</h4>
+                <h4>🛴 Heat Escape Scooter Finishes</h4>
                 <div class="shop-items-row">
                   ${COSMETICS_CATALOG.carPaints.map(item => `
                     <div class="shop-item ${profile.unlocked.carPaints.includes(item.id) ? 'unlocked' : ''} ${profile.equipped.carPaint === item.id ? 'equipped' : ''}" data-cat="carPaints" data-id="${item.id}" data-cost="${item.cost}">
@@ -609,17 +565,11 @@ export class ArcadeHub {
 
     // Instantiate game
     switch (gameId) {
-      case 'rainway':
-        this.activeGameInstance = new RainwayGame(canvas, this.audioCtx, onExit);
-        break;
       case 'fireline':
         this.activeGameInstance = new FirelineGame(canvas, this.audioCtx, onExit);
         break;
       case 'heat_escape':
         this.activeGameInstance = new HeatEscapeGame(canvas, this.audioCtx, onExit);
-        break;
-      case 'water_keeper':
-        this.activeGameInstance = new WaterKeeperGame(canvas, this.audioCtx, onExit);
         break;
       case 'cloud_courier':
         this.activeGameInstance = new CloudCourierGame(canvas, this.audioCtx, onExit);

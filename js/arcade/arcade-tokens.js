@@ -59,10 +59,8 @@ export class ArcadeTokensManager {
       zenDate: new Date().toISOString().slice(0, 10),
       todayZenTokens: 0,
       highScores: {
-        rainway: { score: 0, metric: 'meters' },
         fireline: { score: 0, metric: 'seeds' },
         heat_escape: { score: 0, metric: 'meters' },
-        water_keeper: { score: 0, metric: 'droplets' },
         cloud_courier: { score: 0, metric: 'points' },
         ozone_drift: { score: 0, metric: 'canisters' },
         coral_current: { score: 0, metric: 'meters' },

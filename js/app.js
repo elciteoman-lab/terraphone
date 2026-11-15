@@ -1359,8 +1359,8 @@ class App {
           this.togglePlayback();
         }
       } else if ((e.key === 'c' || e.key === 'C') && document.activeElement !== searchInput) {
-        if (this.currentView === 'arcade') {
-          // Rainway uses 'C' for camera toggle
+        if (this.currentView === 'arcade' && this.arcade?.activeGameInstance) {
+          // In-game arcade controls take priority
           return;
         }
         this.switchExperience(this.currentView === 'rain' ? 'sound-of-change' : 'rain');

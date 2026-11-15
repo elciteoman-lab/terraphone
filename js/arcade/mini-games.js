@@ -1,9 +1,8 @@
 /**
- * Terraphone — Earth Arcade: Six Specialized Environmental Games
+ * Terraphone — Earth Arcade: Specialized Environmental Games
  * NASA Space Apps Challenge
  * 
- * 03. HEAT ESCAPE (NASA ECOSTRESS Land Surface Temperature)
- * 04. WATER KEEPER (NASA SMAP Soil Moisture)
+ * 03. HEAT ESCAPE (NASA ECOSTRESS 5-Lane Subway Runner)
  * 05. CLOUD COURIER (NASA OMI SO2/NO2 & GPM Atmospheric Lift)
  * 06. OZONE DRIFT (NASA Ozone Watch / Aura OMI Stratospheric Samples)
  * 07. CORAL CURRENT (NOAA Coral Reef Watch Bleaching Stress & Thermal Upwellings)
@@ -13,7 +12,7 @@
 import { arcadeTokens } from './arcade-tokens.js';
 
 // ==========================================
-// 03. HEAT ESCAPE (NASA ECOSTRESS LST)
+// 03. HEAT ESCAPE (NASA ECOSTRESS 5-LANE SUBWAY RUNNER)
 // ==========================================
 export class HeatEscapeGame {
   constructor(canvas, audioCtx, onExit) {
@@ -29,176 +28,695 @@ export class HeatEscapeGame {
     this.rafId = null;
     this.lastTime = 0;
 
-    // Player Scooter (Tuned for brisk responsiveness & electric dash)
+    // 5 Discrete Subway-Style Lanes (0: Far Left, 1: Mid Left, 2: Center, 3: Mid Right, 4: Far Right)
+    this.numLanes = 5;
+    this.currentLane = 2;
+    this.targetLane = 2;
+
+    // Player Scooter State
     this.player = {
       x: canvas.width / 2,
-      y: canvas.height * 0.75,
-      speed: 420, // Crisp nimble scooter handling
+      y: canvas.height * 0.72,
+      tilt: 0,
+      jumpY: 0,
+      jumpVel: 0,
+      isJumping: false,
+      isSliding: false,
+      slideTimer: 0,
+      invulnerableTimer: 0,
       hydration: 100, // 0 - 100%
       distance: 0,
-      targetDistance: 1000 // Reach Central Park at 1,000m
+      targetDistance: 1000, // Reach Central Park Oasis at 1,000m
+      dropletsCollected: 0,
+      cryoTimer: 0
     };
 
-    this.keys = { left: false, right: false, up: false, down: false, boost: false };
-    this.cityAvenues = [];
-    this.coolingOases = [];
+    // World & Spawner State
+    this.obstacles = [];
+    this.pickups = [];
+    this.canopies = [];
     this.particles = [];
+    this.nextSpawnDistance = 25;
+    this.touchStartX = 0;
+    this.touchStartY = 0;
 
-    this.initCity();
     this.initInput();
   }
 
-  initCity() {
-    this.cityAvenues = [];
-    this.coolingOases = [];
-
-    // Generate 60 city blocks stretching 2,000 meters forward
-    const numLanes = 5;
-    const laneWidth = this.canvas.width / numLanes;
-
-    for (let i = 0; i < 70; i++) {
-      const lane = i % numLanes;
-      const isPark = (i % 6 === 2) || (i % 8 === 5);
-      const isMistingStation = (i % 11 === 3);
-
-      // NASA ECOSTRESS LST: Asphalt vs Canopy vs Mist
-      let tempLST = isPark ? 24.2 : (isMistingStation ? 21.0 : (46.5 + (Math.sin(i * 1.7) * 5.5)));
-
-      const block = {
-        x: lane * laneWidth + 12,
-        y: -i * 160,
-        w: laneWidth - 24,
-        h: 130,
-        isPark,
-        isMistingStation,
-        tempLST,
-        label: isPark ? 'Urban Park Shade' : (isMistingStation ? 'Hydration Oasis' : 'Asphalt Heat Island')
-      };
-      this.cityAvenues.push(block);
-
-      if (isPark || isMistingStation) {
-        this.coolingOases.push({
-          x: block.x + block.w / 2,
-          y: block.y + block.h / 2,
-          radius: 48,
-          collected: false
-        });
-      }
-    }
+  getRoadGeometry() {
+    const w = this.canvas.width;
+    const roadW = Math.min(w * 0.94, 620);
+    const roadLeft = (w - roadW) / 2;
+    const laneW = roadW / this.numLanes;
+    return {
+      roadW,
+      roadLeft,
+      laneW,
+      getLaneX: (l) => roadLeft + (l + 0.5) * laneW
+    };
   }
 
   initInput() {
     this.onKeyDown = (e) => {
-      if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') this.keys.left = true;
-      if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') this.keys.right = true;
-      if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') this.keys.up = true;
-      if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') this.keys.down = true;
-      if (e.key === ' ' || e.key === 'Shift') this.keys.boost = true;
-      if (e.key === 'r' || e.key === 'R') {
+      if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') {
+        this.changeLane(-1);
+      } else if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') {
+        this.changeLane(1);
+      } else if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp' || e.key === ' ') {
+        this.jump();
+      } else if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') {
+        this.slide();
+      } else if (e.key === 'r' || e.key === 'R') {
         if (this.isGameOver || this.isVictory) this.restart();
+      } else if (e.key === 'Escape') {
+        this.stop();
+        this.onExit?.();
       }
-      if (e.key === 'Escape') { this.stop(); this.onExit?.(); }
     };
-    this.onKeyUp = (e) => {
-      if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') this.keys.left = false;
-      if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') this.keys.right = false;
-      if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') this.keys.up = false;
-      if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') this.keys.down = false;
-      if (e.key === ' ' || e.key === 'Shift') this.keys.boost = false;
+
+    // Mobile Swipe Gesture Support (Subway Surfers feel)
+    this.onTouchStart = (e) => {
+      if (e.touches.length > 0) {
+        this.touchStartX = e.touches[0].clientX;
+        this.touchStartY = e.touches[0].clientY;
+      }
     };
+
+    this.onTouchEnd = (e) => {
+      if (e.changedTouches.length > 0) {
+        const dx = e.changedTouches[0].clientX - this.touchStartX;
+        const dy = e.changedTouches[0].clientY - this.touchStartY;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+
+        if (Math.max(absX, absY) > 28) {
+          if (absX > absY) {
+            dx < 0 ? this.changeLane(-1) : this.changeLane(1);
+          } else {
+            dy < 0 ? this.jump() : this.slide();
+          }
+        }
+      }
+    };
+
     window.addEventListener('keydown', this.onKeyDown);
-    window.addEventListener('keyup', this.onKeyUp);
+    this.canvas.addEventListener('touchstart', this.onTouchStart, { passive: true });
+    this.canvas.addEventListener('touchend', this.onTouchEnd, { passive: true });
+  }
+
+  changeLane(dir) {
+    if (this.isGameOver || this.isVictory) return;
+    const next = Math.max(0, Math.min(4, this.targetLane + dir));
+    if (next !== this.targetLane) {
+      this.targetLane = next;
+      this.playSfx('lane');
+      this.spawnLaneShiftParticles();
+    }
+  }
+
+  jump() {
+    if (this.isGameOver || this.isVictory) return;
+    if (!this.player.isJumping) {
+      this.player.isJumping = true;
+      this.player.jumpVel = -680;
+      this.player.isSliding = false;
+      this.player.slideTimer = 0;
+      this.playSfx('jump');
+    }
+  }
+
+  slide() {
+    if (this.isGameOver || this.isVictory) return;
+    if (this.player.isJumping) {
+      // Subway Surfers fast-fall slam down!
+      this.player.jumpVel = 950;
+    }
+    this.player.isSliding = true;
+    this.player.slideTimer = 0.65;
+    this.playSfx('slide');
   }
 
   restart() {
     this.isGameOver = false;
     this.isVictory = false;
+    this.currentLane = 2;
+    this.targetLane = 2;
+    this.player.x = this.canvas.width / 2;
+    this.player.y = this.canvas.height * 0.72;
+    this.player.tilt = 0;
+    this.player.jumpY = 0;
+    this.player.jumpVel = 0;
+    this.player.isJumping = false;
+    this.player.isSliding = false;
+    this.player.slideTimer = 0;
+    this.player.invulnerableTimer = 0;
     this.player.hydration = 100;
     this.player.distance = 0;
-    this.player.x = this.canvas.width / 2;
-    this.player.y = this.canvas.height * 0.75;
-    this.initCity();
+    this.player.dropletsCollected = 0;
+    this.player.cryoTimer = 0;
+
+    this.obstacles = [];
+    this.pickups = [];
+    this.canopies = [];
+    this.particles = [];
+    this.nextSpawnDistance = 25;
+  }
+
+  spawnLaneShiftParticles() {
+    const geom = this.getRoadGeometry();
+    const x = geom.getLaneX(this.targetLane);
+    for (let i = 0; i < 6; i++) {
+      this.particles.push({
+        x: x + (Math.random() - 0.5) * 20,
+        y: this.player.y + 12,
+        vx: (Math.random() - 0.5) * 80,
+        vy: (Math.random() - 0.5) * 50 + 20,
+        life: 0.35,
+        maxLife: 0.35,
+        color: '#38bdf8',
+        size: 3
+      });
+    }
+  }
+
+  spawnDustParticles() {
+    for (let i = 0; i < 8; i++) {
+      this.particles.push({
+        x: this.player.x + (Math.random() - 0.5) * 26,
+        y: this.player.y + 14,
+        vx: (Math.random() - 0.5) * 110,
+        vy: (Math.random() - 0.5) * 40 - 20,
+        life: 0.4,
+        maxLife: 0.4,
+        color: '#f97316',
+        size: 3.5
+      });
+    }
+  }
+
+  spawnHitParticles() {
+    for (let i = 0; i < 14; i++) {
+      this.particles.push({
+        x: this.player.x + (Math.random() - 0.5) * 20,
+        y: this.player.y + this.player.jumpY,
+        vx: (Math.random() - 0.5) * 220,
+        vy: (Math.random() - 0.5) * 220,
+        life: 0.5,
+        maxLife: 0.5,
+        color: '#ef4444',
+        size: 4
+      });
+    }
+  }
+
+  spawnSplashParticles() {
+    for (let i = 0; i < 18; i++) {
+      this.particles.push({
+        x: this.player.x + (Math.random() - 0.5) * 35,
+        y: this.player.y + this.player.jumpY,
+        vx: (Math.random() - 0.5) * 180,
+        vy: (Math.random() - 0.5) * 160 - 40,
+        life: 0.6,
+        maxLife: 0.6,
+        color: '#38bdf8',
+        size: 4
+      });
+    }
+  }
+
+  spawnDropletParticles(x, y) {
+    for (let i = 0; i < 7; i++) {
+      this.particles.push({
+        x: x || this.player.x,
+        y: y || (this.player.y + this.player.jumpY),
+        vx: (Math.random() - 0.5) * 120,
+        vy: (Math.random() - 0.5) * 120 - 40,
+        life: 0.45,
+        maxLife: 0.45,
+        color: '#06b6d4',
+        size: 3.5
+      });
+    }
+  }
+
+  spawnObstacles(geom) {
+    const d = this.player.distance;
+    const laneW = geom.laneW;
+    const spawnY = -120;
+    const pattern = Math.floor(Math.random() * 6);
+
+    if (pattern === 0) {
+      // Ground hazard: Boiling asphalt rifts (Jump challenge!)
+      const lane1 = Math.floor(Math.random() * 5);
+      const lane2 = (lane1 + 2) % 5;
+      this.obstacles.push({
+        type: 'thermal_rift',
+        lane: lane1,
+        y: spawnY,
+        w: laneW * 0.88,
+        h: 30,
+        tempLST: 52.8
+      });
+      this.obstacles.push({
+        type: 'thermal_rift',
+        lane: lane2,
+        y: spawnY,
+        w: laneW * 0.88,
+        h: 30,
+        tempLST: 51.5
+      });
+      // Floating coin in air over the rift to reward jumping
+      this.pickups.push({
+        type: 'water',
+        lane: lane1,
+        y: spawnY,
+        inAir: true
+      });
+    } else if (pattern === 1) {
+      // Overhead hazard: Scorching steam pipes (Slide challenge!)
+      const lane = Math.floor(Math.random() * 4);
+      this.obstacles.push({
+        type: 'steam_pipe',
+        lane: lane,
+        y: spawnY,
+        w: laneW * 0.9,
+        h: 36,
+        tempLST: 49.2
+      });
+      this.obstacles.push({
+        type: 'steam_pipe',
+        lane: lane + 1,
+        y: spawnY,
+        w: laneW * 0.9,
+        h: 36,
+        tempLST: 49.2
+      });
+    } else if (pattern === 2) {
+      // Tall barrier / delivery van (Lane switch challenge!)
+      const blockedLane = Math.floor(Math.random() * 5);
+      this.obstacles.push({
+        type: 'van',
+        lane: blockedLane,
+        y: spawnY,
+        w: laneW * 0.84,
+        h: 68,
+        tempLST: 47.4
+      });
+      // Clear lane next to it with mist archway or water coin
+      const freeLane = (blockedLane + 1) % 5;
+      if (Math.random() < 0.4) {
+        this.obstacles.push({
+          type: 'mist_arch',
+          lane: freeLane,
+          y: spawnY,
+          w: laneW * 0.95,
+          h: 40,
+          tempLST: 21.0
+        });
+      }
+    } else if (pattern === 3) {
+      // Shaded Tree Canopy corridor over a lane (Green sanctuary!)
+      const canopyLane = Math.floor(Math.random() * 5);
+      this.canopies.push({
+        lane: canopyLane,
+        y: spawnY,
+        h: 320,
+        tempLST: 22.1
+      });
+      // Line of hydration droplets under the trees
+      for (let k = 0; k < 4; k++) {
+        this.pickups.push({
+          type: 'water',
+          lane: canopyLane,
+          y: spawnY + k * 65,
+          inAir: false
+        });
+      }
+    } else if (pattern === 4) {
+      // Coin trail: 5 water droplets in a single lane
+      const coinLane = Math.floor(Math.random() * 5);
+      for (let k = 0; k < 5; k++) {
+        this.pickups.push({
+          type: 'water',
+          lane: coinLane,
+          y: spawnY + k * 48,
+          inAir: false
+        });
+      }
+      // Rare Cryo-Boost ice crystal power-up
+      if (Math.random() < 0.25 && this.player.cryoTimer <= 0) {
+        const cLane = (coinLane + 2) % 5;
+        this.pickups.push({
+          type: 'cryo',
+          lane: cLane,
+          y: spawnY + 70,
+          inAir: false
+        });
+      }
+    } else {
+      // Mist archway + van combo
+      const archLane = Math.floor(Math.random() * 5);
+      this.obstacles.push({
+        type: 'mist_arch',
+        lane: archLane,
+        y: spawnY,
+        w: laneW * 0.95,
+        h: 40,
+        tempLST: 20.8
+      });
+      const vanLane = (archLane + 2) % 5;
+      this.obstacles.push({
+        type: 'van',
+        lane: vanLane,
+        y: spawnY - 30,
+        w: laneW * 0.84,
+        h: 68,
+        tempLST: 48.0
+      });
+    }
+
+    // Schedule next spawn distance
+    const baseGap = Math.max(42, 70 - (d / 1000) * 25);
+    this.nextSpawnDistance = d + baseGap;
   }
 
   update(dt) {
     if (this.isGameOver || this.isVictory) return;
 
-    let dx = 0, dy = 0;
-    if (this.keys.left) dx -= 1;
-    if (this.keys.right) dx += 1;
-    if (this.keys.up) dy -= 1;
-    if (this.keys.down) dy += 1;
+    const geom = this.getRoadGeometry();
 
-    // Scooter movement with electric turbo boost
-    const curSpeed = this.player.speed * (this.keys.boost ? 1.38 : 1.0);
-    this.player.x += dx * curSpeed * dt;
-    this.player.y += dy * (curSpeed * 0.8) * dt;
+    // Speed progression: increases smoothly with distance
+    const baseSpeed = 380 + Math.min(260, this.player.distance * 0.28);
+    const scrollSpeed = baseSpeed * (this.player.cryoTimer > 0 ? 1.25 : 1.0);
 
-    // Boundaries
-    this.player.x = Math.max(30, Math.min(this.canvas.width - 30, this.player.x));
-    this.player.y = Math.max(this.canvas.height * 0.3, Math.min(this.canvas.height - 40, this.player.y));
+    // Distance progression
+    this.player.distance += (scrollSpeed / 14) * dt;
 
-    // Continuous forward progress (balanced pacing)
-    const forwardSpeed = (this.keys.up ? 75 : 50) * (this.keys.boost ? 1.35 : 1.0);
-    this.player.distance += dt * forwardSpeed;
+    // Smooth snappy Subway Surfers lane snapping
+    const targetX = geom.getLaneX(this.targetLane);
+    this.player.x += (targetX - this.player.x) * Math.min(1.0, 22.0 * dt);
+    this.player.tilt = Math.max(-0.35, Math.min(0.35, (targetX - this.player.x) * 0.0024));
 
-    // Scroll city avenues downward relative to progress
-    const scrollY = this.player.distance * 14;
+    // Jump physics with gravity
+    if (this.player.isJumping) {
+      this.player.jumpVel += 1850 * dt;
+      this.player.jumpY += this.player.jumpVel * dt;
+      if (this.player.jumpY >= 0) {
+        this.player.jumpY = 0;
+        this.player.jumpVel = 0;
+        this.player.isJumping = false;
+        this.spawnDustParticles();
+      }
+    }
 
-    // Check current temperature zone player is standing in
+    // Slide timer
+    if (this.player.isSliding) {
+      this.player.slideTimer -= dt;
+      if (this.player.slideTimer <= 0) {
+        this.player.isSliding = false;
+      }
+    }
+
+    // Powerup / Invulnerability timers
+    if (this.player.invulnerableTimer > 0) this.player.invulnerableTimer -= dt;
+    if (this.player.cryoTimer > 0) this.player.cryoTimer -= dt;
+
+    // Spawn obstacles
+    if (this.player.distance >= this.nextSpawnDistance) {
+      this.spawnObstacles(geom);
+    }
+
+    // Scroll canopies downward
+    this.canopies.forEach(c => {
+      c.y += scrollSpeed * dt;
+    });
+    this.canopies = this.canopies.filter(c => c.y < this.canvas.height + 150);
+
+    // Check if player is currently under canopy shade or mist
     let inCoolZone = false;
-    let currentTemp = 48.0;
+    let currentTemp = 48.5 + Math.sin(this.player.distance * 0.08) * 3.5;
 
-    this.cityAvenues.forEach(b => {
-      const renderY = b.y + scrollY;
-      if (this.player.x >= b.x && this.player.x <= b.x + b.w &&
-          this.player.y >= renderY && this.player.y <= renderY + b.h) {
-        currentTemp = b.tempLST;
-        if (b.isPark || b.isMistingStation) inCoolZone = true;
+    this.canopies.forEach(c => {
+      if (c.lane === this.targetLane) {
+        if (this.player.y >= c.y && this.player.y <= c.y + c.h) {
+          inCoolZone = true;
+          currentTemp = c.tempLST;
+        }
       }
     });
 
-    // Hydration physics (forgiving heat drain & generous canopy replenishment)
-    if (inCoolZone) {
-      this.player.hydration = Math.min(100, this.player.hydration + 35 * dt);
+    // Hydration physics driven by NASA ECOSTRESS Surface Temp
+    if (this.player.cryoTimer > 0) {
+      // Cryo-boost ice shield: zero heat drain + cooling
+      this.player.hydration = Math.min(100, this.player.hydration + 18 * dt);
+      currentTemp = 18.0;
+    } else if (inCoolZone) {
+      // Shaded tree canopy: rapid hydration recovery
+      this.player.hydration = Math.min(100, this.player.hydration + 40 * dt);
     } else {
-      // Hot asphalt heat island drains hydration gently
-      const heatIntensity = Math.max(0.5, (currentTemp - 32) / 18);
-      this.player.hydration = Math.max(0, this.player.hydration - 7.5 * heatIntensity * dt);
+      // Hot asphalt heat island: steady heat fatigue
+      const heatFactor = Math.max(0.6, (currentTemp - 30) / 18);
+      this.player.hydration = Math.max(0, this.player.hydration - 6.2 * heatFactor * dt);
     }
 
-    // Check Game Over condition
+    // Update obstacles & collisions
+    this.obstacles.forEach(o => {
+      o.y += scrollSpeed * dt;
+
+      // Check collision
+      const laneX = geom.getLaneX(o.lane);
+      const isPlayerInLane = Math.abs(this.player.x - laneX) < geom.laneW * 0.44;
+      const isYInRange = Math.abs(this.player.y - (o.y + o.h / 2)) < (o.h / 2 + 18);
+
+      if (isPlayerInLane && isYInRange) {
+        if (o.type === 'thermal_rift') {
+          // Can be jumped over!
+          if (this.player.jumpY < -28) {
+            // Jumped safely over the crack!
+          } else if (this.player.invulnerableTimer <= 0 && this.player.cryoTimer <= 0) {
+            this.player.hydration = Math.max(0, this.player.hydration - 18);
+            this.player.invulnerableTimer = 1.0;
+            this.playSfx('hit');
+            this.spawnHitParticles();
+          }
+        } else if (o.type === 'steam_pipe') {
+          // Can be slid under!
+          if (this.player.isSliding) {
+            // Slid safely under the pipe!
+          } else if (this.player.invulnerableTimer <= 0 && this.player.cryoTimer <= 0) {
+            this.player.hydration = Math.max(0, this.player.hydration - 18);
+            this.player.invulnerableTimer = 1.0;
+            this.playSfx('hit');
+            this.spawnHitParticles();
+          }
+        } else if (o.type === 'van') {
+          // Tall barrier: cannot jump or slide; must dodge!
+          if (this.player.invulnerableTimer <= 0 && this.player.cryoTimer <= 0) {
+            this.player.hydration = Math.max(0, this.player.hydration - 25);
+            this.player.invulnerableTimer = 1.2;
+            this.playSfx('hit');
+            this.spawnHitParticles();
+          }
+        } else if (o.type === 'mist_arch') {
+          // Hydration mist gateway
+          if (!o.collected) {
+            o.collected = true;
+            this.player.hydration = Math.min(100, this.player.hydration + 25);
+            this.playSfx('mist');
+            this.spawnSplashParticles();
+          }
+        }
+      }
+    });
+    this.obstacles = this.obstacles.filter(o => o.y < this.canvas.height + 150);
+
+    // Update pickups (Water droplets & Cryo crystals)
+    this.pickups.forEach(p => {
+      p.y += scrollSpeed * dt;
+
+      // Magnet effect when Cryo-Boost is active
+      if (this.player.cryoTimer > 0 && p.type === 'water') {
+        const pLaneX = geom.getLaneX(p.lane);
+        p.x = p.x !== undefined ? p.x : pLaneX;
+        p.x += (this.player.x - p.x) * Math.min(1.0, 14.0 * dt);
+      }
+
+      const pX = p.x !== undefined ? p.x : geom.getLaneX(p.lane);
+      const isPlayerNear = Math.hypot(this.player.x - pX, (this.player.y + this.player.jumpY) - p.y) < 38;
+
+      if (isPlayerNear && !p.collected) {
+        p.collected = true;
+        if (p.type === 'water') {
+          this.player.hydration = Math.min(100, this.player.hydration + 2.5);
+          this.player.dropletsCollected++;
+          this.playSfx('coin');
+          this.spawnDropletParticles(pX, p.y);
+        } else if (p.type === 'cryo') {
+          this.player.cryoTimer = 6.0;
+          this.playSfx('mist');
+          this.spawnSplashParticles();
+        }
+      }
+    });
+    this.pickups = this.pickups.filter(p => !p.collected && p.y < this.canvas.height + 120);
+
+    // Update particles
+    this.particles.forEach(pt => {
+      pt.x += pt.vx * dt;
+      pt.y += pt.vy * dt;
+      pt.life -= dt;
+    });
+    this.particles = this.particles.filter(pt => pt.life > 0);
+
+    // Game Over condition
     if (this.player.hydration <= 0) {
       this.isGameOver = true;
+      arcadeTokens.recordHighScore('heat_escape', Math.floor(this.player.distance), 'meters');
       return;
     }
 
-    // Check Victory condition (reached 1,000m Central Park Botanical Oasis)
+    // Victory condition (1,000 meters reached!)
     if (this.player.distance >= this.player.targetDistance) {
       this.isVictory = true;
-      arcadeTokens.addTokens(5, 'Escaped Urban Heat Island');
+      arcadeTokens.addTokens(5, 'Subway Heat Island Escaped');
       arcadeTokens.recordHighScore('heat_escape', Math.floor(this.player.distance), 'meters');
     }
 
     arcadeTokens.recordHighScore('heat_escape', Math.floor(this.player.distance), 'meters');
+    this.lastLST = currentTemp;
+  }
+
+  playSfx(type) {
+    if (!this.audioCtx) return;
+    try {
+      if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+      const now = this.audioCtx.currentTime;
+
+      if (type === 'lane') {
+        const osc = this.audioCtx.createOscillator();
+        const g = this.audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(660, now + 0.08);
+        g.gain.setValueAtTime(0.08, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(g);
+        g.connect(this.audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.09);
+      } else if (type === 'jump') {
+        const osc = this.audioCtx.createOscillator();
+        const g = this.audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(740, now + 0.16);
+        g.gain.setValueAtTime(0.12, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        osc.connect(g);
+        g.connect(this.audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.17);
+      } else if (type === 'slide') {
+        const osc = this.audioCtx.createOscillator();
+        const g = this.audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.14);
+        g.gain.setValueAtTime(0.09, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        osc.connect(g);
+        g.connect(this.audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } else if (type === 'coin') {
+        const osc1 = this.audioCtx.createOscillator();
+        const osc2 = this.audioCtx.createOscillator();
+        const g = this.audioCtx.createGain();
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(988, now);
+        osc2.frequency.setValueAtTime(1318, now + 0.04);
+        g.gain.setValueAtTime(0.10, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc1.connect(g);
+        osc2.connect(g);
+        g.connect(this.audioCtx.destination);
+        osc1.start(now);
+        osc2.start(now + 0.04);
+        osc1.stop(now + 0.19);
+        osc2.stop(now + 0.19);
+      } else if (type === 'mist') {
+        const osc = this.audioCtx.createOscillator();
+        const g = this.audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.22);
+        g.gain.setValueAtTime(0.14, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+        osc.connect(g);
+        g.connect(this.audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.23);
+      } else if (type === 'hit') {
+        const osc = this.audioCtx.createOscillator();
+        const g = this.audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(55, now + 0.18);
+        g.gain.setValueAtTime(0.20, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.connect(g);
+        g.connect(this.audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.19);
+      }
+    } catch (e) {
+      // AudioContext fallback
+    }
   }
 
   render() {
     const ctx = this.ctx;
     const w = this.canvas.width;
     const h = this.canvas.height;
-    const scrollY = this.player.distance * 14;
+    const geom = this.getRoadGeometry();
 
-    // Base background: Hot shimmering asphalt
-    ctx.fillStyle = '#1c1917';
+    // 1. Urban Background (Deep night city with ambient heat haze)
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+    bgGrad.addColorStop(0, '#0c0e18');
+    bgGrad.addColorStop(0.6, '#18121a');
+    bgGrad.addColorStop(1, '#1f1315');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, w, h);
 
-    // City lane markings
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    // 2. Sidewalk borders on left and right of the 5 lanes
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+    ctx.fillRect(geom.roadLeft - 40, 0, 40, h);
+    ctx.fillRect(geom.roadLeft + geom.roadW, 0, 40, h);
+
+    // 3. 5-Lane Subway Asphalt Surface
+    ctx.fillStyle = '#171720';
+    ctx.fillRect(geom.roadLeft, 0, geom.roadW, h);
+
+    // Road Edge Curbs (Glowing neon borders)
+    ctx.strokeStyle = '#f97316';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(geom.roadLeft, 0);
+    ctx.lineTo(geom.roadLeft, h);
+    ctx.moveTo(geom.roadLeft + geom.roadW, 0);
+    ctx.lineTo(geom.roadLeft + geom.roadW, h);
+    ctx.stroke();
+
+    // 4. Moving Lane Dividers (Dashed stripes zooming down at high velocity)
+    const stripeOffset = (this.player.distance * 22) % 40;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 2;
     ctx.setLineDash([20, 20]);
-    for (let l = 1; l < 5; l++) {
-      const lx = (w / 5) * l;
+    ctx.lineDashOffset = -stripeOffset;
+
+    for (let l = 1; l < this.numLanes; l++) {
+      const lx = geom.roadLeft + l * geom.laneW;
       ctx.beginPath();
       ctx.moveTo(lx, 0);
       ctx.lineTo(lx, h);
@@ -206,135 +724,354 @@ export class HeatEscapeGame {
     }
     ctx.setLineDash([]);
 
-    // Render City Blocks / ECOSTRESS Heat Zones
-    this.cityAvenues.forEach(b => {
-      const by = b.y + scrollY;
-      if (by < -150 || by > h + 150) return;
+    // 5. Render Shaded Tree Canopies (Green cooling zones)
+    this.canopies.forEach(c => {
+      const cx = geom.roadLeft + c.lane * geom.laneW;
+      const cy = c.y;
 
-      // Color variation driven by NASA ECOSTRESS Surface Temp
-      if (b.isMistingStation) {
-        ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
-        ctx.strokeStyle = '#38bdf8';
-      } else if (b.isPark) {
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.24)';
-        ctx.strokeStyle = '#10b981';
-      } else if (b.tempLST > 48) {
-        ctx.fillStyle = 'rgba(239, 68, 68, 0.25)'; // Extreme Heat Island
-        ctx.strokeStyle = '#ef4444';
-      } else {
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.18)'; // Moderate Urban Heat
-        ctx.strokeStyle = '#f59e0b';
-      }
+      // Leafy green shade overlay over the lane
+      const canopyGrad = ctx.createLinearGradient(cx, cy, cx, cy + c.h);
+      canopyGrad.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+      canopyGrad.addColorStop(0.5, 'rgba(5, 150, 105, 0.45)');
+      canopyGrad.addColorStop(1, 'rgba(16, 185, 129, 0.35)');
 
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(b.x, by, b.w, b.h, 10);
-      ctx.fill();
-      ctx.stroke();
+      ctx.fillStyle = canopyGrad;
+      ctx.fillRect(cx, cy, geom.laneW, c.h);
 
-      // Zone Label & LST Reading
-      ctx.fillStyle = b.isPark ? '#34d399' : (b.isMistingStation ? '#38bdf8' : '#fb923c');
+      // Trellis borders
+      ctx.strokeStyle = '#10b981';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx + 2, cy, geom.laneW - 4, c.h);
+
+      // Canopy header label
+      ctx.fillStyle = '#34d399';
       ctx.font = 'bold 11px system-ui';
-      ctx.textAlign = 'left';
-      ctx.fillText(`${b.isMistingStation ? '💧' : (b.isPark ? '🌳' : '🔥')} ${b.tempLST.toFixed(1)}°C LST`, b.x + 10, by + 22);
-
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '10px system-ui';
-      ctx.fillText(b.label, b.x + 10, by + 38);
+      ctx.textAlign = 'center';
+      ctx.fillText('🌳 22°C CANOPY SHADE', cx + geom.laneW / 2, cy + 20);
     });
 
-    // Player Scooter
-    ctx.save();
-    ctx.translate(this.player.x, this.player.y);
+    // 6. Render Obstacles
+    this.obstacles.forEach(o => {
+      const ox = geom.roadLeft + o.lane * geom.laneW + (geom.laneW - o.w) / 2;
+      const oy = o.y;
 
-    // Hydration aura
-    const hydraColor = this.player.hydration > 50 ? '#38bdf8' : (this.player.hydration > 25 ? '#f59e0b' : '#ef4444');
-    ctx.shadowColor = hydraColor;
-    ctx.shadowBlur = 16;
-    ctx.fillStyle = hydraColor;
+      if (o.type === 'thermal_rift') {
+        // Ground asphalt boiling crack (Jump over!)
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.28)';
+        ctx.beginPath();
+        ctx.roundRect(ox, oy, o.w, o.h, 6);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(ox + 4, oy + o.h / 2);
+        ctx.lineTo(ox + o.w * 0.3, oy + 4);
+        ctx.lineTo(ox + o.w * 0.65, oy + o.h - 4);
+        ctx.lineTo(ox + o.w - 4, oy + o.h / 2);
+        ctx.stroke();
+
+        ctx.fillStyle = '#fb923c';
+        ctx.font = 'bold 10px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔥 JUMP!', ox + o.w / 2, oy + o.h / 2 + 3);
+      } else if (o.type === 'steam_pipe') {
+        // Overhead steam conduit (Slide under!)
+        ctx.fillStyle = '#475569';
+        ctx.fillRect(ox, oy, o.w, 14);
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(ox + o.w * 0.45, oy + 14, o.w * 0.1, 12); // nozzle
+
+        // Billowing white steam jetting down
+        const steamGrad = ctx.createLinearGradient(ox, oy + 14, ox, oy + o.h);
+        steamGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+        steamGrad.addColorStop(1, 'rgba(255, 255, 255, 0.0)');
+        ctx.fillStyle = steamGrad;
+        ctx.fillRect(ox + o.w * 0.2, oy + 14, o.w * 0.6, o.h - 14);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 10px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('💨 SLIDE!', ox + o.w / 2, oy - 4);
+      } else if (o.type === 'van') {
+        // Tall delivery van / barrier (Lane switch!)
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.roundRect(ox, oy, o.w, o.h, 8);
+        ctx.fill();
+
+        // Van roof
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.roundRect(ox + 4, oy + 6, o.w - 8, o.h - 16, 6);
+        ctx.fill();
+
+        // Hazard flashers
+        const blink = Math.sin(this.player.distance * 0.4) > 0;
+        ctx.fillStyle = blink ? '#fbbf24' : '#78350f';
+        ctx.fillRect(ox + 6, oy + o.h - 8, 8, 4);
+        ctx.fillRect(ox + o.w - 14, oy + o.h - 8, 8, 4);
+
+        ctx.fillStyle = '#f87171';
+        ctx.font = 'bold 10px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ BLOCKED', ox + o.w / 2, oy + o.h / 2);
+      } else if (o.type === 'mist_arch') {
+        // High-tech urban misting archway
+        ctx.strokeStyle = '#06b6d4';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(ox, oy, o.w, o.h);
+
+        const mistGlow = ctx.createLinearGradient(ox, oy, ox, oy + o.h);
+        mistGlow.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+        mistGlow.addColorStop(1, 'rgba(56, 189, 248, 0.05)');
+        ctx.fillStyle = mistGlow;
+        ctx.fillRect(ox, oy, o.w, o.h);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = '800 10.5px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('💧 MIST STATION', ox + o.w / 2, oy + o.h / 2 + 4);
+      }
+    });
+
+    // 7. Render Pickups (Water droplets & Cryo crystals)
+    this.pickups.forEach(p => {
+      const px = p.x !== undefined ? p.x : geom.getLaneX(p.lane);
+      const py = p.y;
+
+      if (p.type === 'water') {
+        // Sparkling water droplet (coin)
+        ctx.save();
+        ctx.translate(px, py);
+        const floatY = Math.sin(this.player.distance * 0.2 + p.lane) * 4;
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.shadowColor = '#06b6d4';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(0, floatY, 9, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath();
+        ctx.arc(-3, floatY - 3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (p.type === 'cryo') {
+        // Rare Cryo-Ice crystal power-up
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(this.player.distance * 0.05);
+
+        ctx.fillStyle = '#a5f3fc';
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 16;
+        ctx.beginPath();
+        ctx.moveTo(0, -12);
+        ctx.lineTo(10, 0);
+        ctx.lineTo(0, 12);
+        ctx.lineTo(-10, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+    });
+
+    // 8. Render Particles
+    this.particles.forEach(pt => {
+      ctx.fillStyle = pt.color;
+      ctx.globalAlpha = Math.max(0, pt.life / pt.maxLife);
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+    });
+
+    // 9. Render Player Electric Scooter (Subway Surfers perspective)
+    ctx.save();
+    const renderX = this.player.x;
+    const renderY = this.player.y + this.player.jumpY;
+
+    // Ground Shadow (stays on the ground when jumping, scales down with height)
+    const shadowScale = Math.max(0.4, 1.0 + this.player.jumpY * 0.003);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.beginPath();
-    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.ellipse(renderX, this.player.y + 16, 18 * shadowScale, 6 * shadowScale, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Scooter Body
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(-4, -14, 8, 28);
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(-2, -18, 4, 8); // Headlight
+    // Scooter Body with lean angle
+    ctx.translate(renderX, renderY);
+    ctx.rotate(this.player.tilt);
+
+    // Invulnerability flashing
+    const isFlashing = this.player.invulnerableTimer > 0 && Math.floor(this.player.invulnerableTimer * 12) % 2 === 0;
+
+    if (!isFlashing) {
+      // Cryo-boost ice shield bubble
+      if (this.player.cryoTimer > 0) {
+        ctx.strokeStyle = '#38bdf8';
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.18)';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 18;
+        ctx.beginPath();
+        ctx.arc(0, -4, 26, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // Scooter deck
+      const isSliding = this.player.isSliding;
+      const scooterColor = this.player.hydration > 50 ? '#38bdf8' : (this.player.hydration > 25 ? '#f59e0b' : '#ef4444');
+
+      // Headlight beam projecting forward
+      const beamGrad = ctx.createLinearGradient(0, -18, 0, -120);
+      beamGrad.addColorStop(0, 'rgba(231, 244, 52, 0.4)');
+      beamGrad.addColorStop(1, 'rgba(231, 244, 52, 0.0)');
+      ctx.fillStyle = beamGrad;
+      ctx.beginPath();
+      ctx.moveTo(-6, -18);
+      ctx.lineTo(-24, -120);
+      ctx.lineTo(24, -120);
+      ctx.lineTo(6, -18);
+      ctx.closePath();
+      ctx.fill();
+
+      // Scooter frame
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(-5, isSliding ? -6 : -16, 10, isSliding ? 20 : 32);
+
+      // Rider helmet & silhouette
+      ctx.fillStyle = scooterColor;
+      ctx.shadowColor = scooterColor;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(0, isSliding ? -4 : -16, isSliding ? 8 : 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Neon wheels
+      ctx.fillStyle = '#E7F434'; // Space Apps Neon Yellow
+      ctx.fillRect(-4, isSliding ? 10 : 14, 8, 4);
+    }
     ctx.restore();
 
-    // Bottom Telemetry HUD (Non-blocking)
-    const hudY = h - 96;
-    ctx.fillStyle = 'rgba(10, 15, 26, 0.9)';
+    // 10. Top HUD: 5-Lane Track Indicator & Telemetry
+    // Top-Center: 5-Lane Position Snap Tracker
+    const trackW = 190;
+    const trackH = 34;
+    const trackX = (w - trackW) / 2;
+    const trackY = 16;
+
+    ctx.fillStyle = 'rgba(12, 14, 24, 0.88)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(24, hudY, 340, 72, 14);
+    ctx.roundRect(trackX, trackY, trackW, trackH, 17);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = '#f97316';
-    ctx.font = 'bold 11px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText('🛰️ NASA ECOSTRESS LAND SURFACE TEMPERATURE', 38, hudY + 22);
+    for (let l = 0; l < 5; l++) {
+      const segX = trackX + 10 + l * 34;
+      const isCurrent = l === this.targetLane;
+      ctx.fillStyle = isCurrent ? '#E7F434' : 'rgba(255, 255, 255, 0.15)';
+      ctx.beginPath();
+      ctx.roundRect(segX, trackY + 6, 28, 22, 6);
+      ctx.fill();
+
+      ctx.fillStyle = isCurrent ? '#0c0e18' : '#94a3b8';
+      ctx.font = isCurrent ? 'bold 11.5px system-ui' : '10.5px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText(`L${l + 1}`, segX + 14, trackY + 21);
+    }
+
+    // Top-Left: Distance to Central Park
+    ctx.beginPath();
+    ctx.roundRect(20, trackY, 210, trackH, 17);
+    ctx.fillStyle = 'rgba(12, 14, 24, 0.88)';
+    ctx.fill();
+    ctx.stroke();
 
     ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 13.5px system-ui';
-    ctx.fillText(`Goal: Reach Central Botanical Oasis (${Math.floor(this.player.distance)} / ${this.player.targetDistance}m)`, 38, hudY + 43);
+    ctx.font = 'bold 12px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText(`🌳 Goal: ${Math.floor(this.player.distance)} / ${this.player.targetDistance}m`, 32, trackY + 21);
 
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10.5px system-ui';
-    ctx.fillText('Chain shaded parks & mist stations to survive heat fatigue', 38, hudY + 60);
-
-    // Right: Hydration Bar
+    // Top-Right: Hydration & Droplets Count
+    const rightHudW = 190;
     ctx.beginPath();
-    ctx.roundRect(w - 220, hudY, 196, 72, 14);
+    ctx.roundRect(w - rightHudW - 20, trackY, rightHudW, trackH, 17);
+    ctx.fillStyle = 'rgba(12, 14, 24, 0.88)';
     ctx.fill();
     ctx.stroke();
 
+    const hydraColor = this.player.hydration > 50 ? '#38bdf8' : (this.player.hydration > 25 ? '#f59e0b' : '#ef4444');
     ctx.fillStyle = hydraColor;
-    ctx.font = '800 18px system-ui';
-    ctx.textAlign = 'right';
-    ctx.fillText(`💧 ${Math.round(this.player.hydration)}%`, w - 42, hudY + 34);
+    ctx.font = '800 12.5px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText(`💧 ${Math.round(this.player.hydration)}%`, w - rightHudW - 8, trackY + 21);
 
-    // Hydration progress bar
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.roundRect(w - 200, hudY + 44, 158, 10, 5);
+    ctx.fillStyle = '#E7F434';
+    ctx.font = 'bold 12px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(`🪙 ${this.player.dropletsCollected}`, w - 32, trackY + 21);
+
+    // 11. Bottom Card: NASA ECOSTRESS Land Surface Temp Readout
+    const botH = 68;
+    const botY = h - botH - 16;
+    ctx.fillStyle = 'rgba(12, 14, 24, 0.92)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(24, botY, Math.min(w - 48, 540), botH, 14);
     ctx.fill();
-    ctx.fillStyle = hydraColor;
-    ctx.roundRect(w - 200, hudY + 44, 158 * (this.player.hydration / 100), 10, 5);
-    ctx.fill();
+    ctx.stroke();
+
+    const isCool = (this.lastLST || 48) < 30;
+    ctx.fillStyle = isCool ? '#34d399' : '#f97316';
+    ctx.font = 'bold 11px system-ui';
+    ctx.textAlign = 'left';
+    ctx.fillText('🛰️ NASA ECOSTRESS THERMAL SATELLITE TELEMETRY', 38, botY + 20);
+
+    ctx.fillStyle = isCool ? '#10b981' : '#f87171';
+    ctx.font = '800 13px system-ui';
+    ctx.fillText(`${isCool ? '🌳 COOL CANOPY OASIS' : '🔥 ASPHALT HEAT ISLAND'}: ${(this.lastLST || 48).toFixed(1)}°C LST (Lane ${this.targetLane + 1})`, 38, botY + 39);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '10px system-ui';
+    ctx.fillText('A/D / ←/→: Snap 5 Lanes | W/↑/Space: Jump | S/↓: Slide | Swipe on Touch', 38, botY + 55);
 
     // Game Over Overlay
     if (this.isGameOver) {
-      ctx.fillStyle = 'rgba(3, 7, 18, 0.88)';
+      ctx.fillStyle = 'rgba(3, 7, 18, 0.90)';
       ctx.fillRect(0, 0, w, h);
       ctx.fillStyle = '#ef4444';
-      ctx.font = '800 28px system-ui';
+      ctx.font = '800 30px system-ui';
       ctx.textAlign = 'center';
       ctx.fillText('🔥 HEAT STROKE FATIGUE', w / 2, h / 2 - 30);
       ctx.fillStyle = '#f8fafc';
       ctx.font = '500 14px system-ui';
-      ctx.fillText(`Hydration depleted at ${Math.floor(this.player.distance)} meters under extreme pavement heat.`, w / 2, h / 2 + 5);
+      ctx.fillText(`Hydration depleted at ${Math.floor(this.player.distance)}m in the urban heat island.`, w / 2, h / 2 + 5);
       ctx.fillStyle = '#38bdf8';
-      ctx.font = 'bold 13px system-ui';
+      ctx.font = 'bold 14px system-ui';
       ctx.fillText('Press R to Try Again', w / 2, h / 2 + 45);
     }
 
     // Victory Overlay
     if (this.isVictory) {
-      ctx.fillStyle = 'rgba(3, 7, 18, 0.88)';
+      ctx.fillStyle = 'rgba(3, 7, 18, 0.90)';
       ctx.fillRect(0, 0, w, h);
       ctx.fillStyle = '#10b981';
-      ctx.font = '800 28px system-ui';
+      ctx.font = '800 30px system-ui';
       ctx.textAlign = 'center';
       ctx.fillText('🌳 CENTRAL PARK OASIS REACHED! 🌳', w / 2, h / 2 - 35);
       ctx.fillStyle = '#f8fafc';
       ctx.font = '500 14px system-ui';
-      ctx.fillText('You navigated 1,000 meters of urban heat islands into cool canopy shade.', w / 2, h / 2);
-      ctx.fillStyle = '#fbbf24';
+      ctx.fillText(`You dashed 1,000 meters across 5 lanes and collected ${this.player.dropletsCollected} hydration droplets!`, w / 2, h / 2);
+      ctx.fillStyle = '#E7F434';
       ctx.font = 'bold 16px system-ui';
-      ctx.fillText('🪙 +20 Zen Tokens Awarded', w / 2, h / 2 + 35);
+      ctx.fillText('🪙 +5 Zen Tokens Awarded', w / 2, h / 2 + 35);
       ctx.fillStyle = '#94a3b8';
       ctx.font = '12px system-ui';
       ctx.fillText('Press Esc or Exit Game to return to the Arcade Hub', w / 2, h / 2 + 68);
@@ -356,253 +1093,22 @@ export class HeatEscapeGame {
     };
     this.rafId = requestAnimationFrame(loop);
   }
+
   pause() { this.isPaused = true; }
   resume() { this.isPaused = false; this.lastTime = performance.now(); }
+
   stop() {
     this.isRunning = false;
     this.isPaused = false;
     if (this.rafId) cancelAnimationFrame(this.rafId);
     window.removeEventListener('keydown', this.onKeyDown);
-    window.removeEventListener('keyup', this.onKeyUp);
+    if (this.canvas) {
+      this.canvas.removeEventListener('touchstart', this.onTouchStart);
+      this.canvas.removeEventListener('touchend', this.onTouchEnd);
+    }
   }
 }
 
-// ==========================================
-// 04. WATER KEEPER (NASA SMAP Soil Moisture)
-// ==========================================
-export class WaterKeeperGame {
-  constructor(canvas, audioCtx, onExit) {
-    this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
-    this.audioCtx = audioCtx;
-    this.onExit = onExit;
-
-    this.isRunning = false;
-    this.isPaused = false;
-    this.isVictory = false;
-    this.rafId = null;
-    this.lastTime = 0;
-
-    // Droplet physics
-    this.drop = {
-      x: 140,
-      y: 200,
-      vy: 0,
-      size: 16,
-      grounded: false,
-      squash: 1
-    };
-
-    this.scrollX = 0;
-    this.patchesRestored = 0;
-    this.targetPatches = 20;
-    this.dropletsCollected = 0;
-    this.particles = [];
-
-    this.initInput();
-  }
-
-  // Pure procedural height & moisture function (guarantees infinite rendering without missing segments)
-  getTerrainAt(worldX) {
-    const baseH = this.canvas.height ? this.canvas.height * 0.65 : 450;
-    const wave1 = Math.sin(worldX * 0.0035) * 65;
-    const wave2 = Math.sin(worldX * 0.009) * 25;
-    const y = baseH + wave1 + wave2;
-
-    // NASA SMAP volumetric soil moisture (0.05 to 0.42 cm3/cm3)
-    const moistNoise = Math.sin(worldX * 0.002) * 0.5 + 0.5;
-    const moisture = 0.08 + moistNoise * 0.32;
-    return { y, moisture };
-  }
-
-  initInput() {
-    this.onKeyDown = (e) => {
-      if ((e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') && this.drop.grounded) {
-        this.drop.vy = -460;
-        this.drop.grounded = false;
-        this.drop.squash = 1.35;
-      }
-      if (e.key === 'Escape') { this.stop(); this.onExit?.(); }
-    };
-    window.addEventListener('keydown', this.onKeyDown);
-  }
-
-  update(dt) {
-    if (this.isVictory) return;
-
-    // Horizontal speed
-    this.scrollX += 160 * dt;
-
-    // Gravity & Jump Physics
-    this.drop.vy += 980 * dt;
-    this.drop.y += this.drop.vy * dt;
-
-    // Floor collision against continuous terrain
-    const playerWorldX = this.scrollX + this.drop.x;
-    const ground = this.getTerrainAt(playerWorldX);
-
-    if (this.drop.y >= ground.y - this.drop.size) {
-      this.drop.y = ground.y - this.drop.size;
-      this.drop.vy = 0;
-      this.drop.grounded = true;
-      this.drop.squash = 0.85;
-
-      // Restoring moisture
-      if (ground.moisture < 0.22 && Math.random() < 0.08) {
-        this.patchesRestored += 1;
-        arcadeTokens.addTokens(1, 'Moisture Restored to Arid Soil');
-        if (this.patchesRestored >= this.targetPatches && !this.isVictory) {
-          this.isVictory = true;
-          arcadeTokens.addTokens(5, 'Watershed Soil Restored');
-        }
-      }
-    } else {
-      this.drop.grounded = false;
-      this.drop.squash += (1.0 - this.drop.squash) * 0.15;
-    }
-
-    arcadeTokens.recordHighScore('water_keeper', this.patchesRestored, 'patches');
-  }
-
-  render() {
-    const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
-
-    // Sky gradient
-    const sky = ctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, '#020617');
-    sky.addColorStop(1, '#0f172a');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, h);
-
-    // Continuous Terrain Rendering across screen width
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-
-    const step = 16;
-    for (let screenX = 0; screenX <= w + step; screenX += step) {
-      const worldX = this.scrollX + screenX;
-      const t = this.getTerrainAt(worldX);
-      ctx.lineTo(screenX, t.y);
-    }
-    ctx.lineTo(w, h);
-    ctx.closePath();
-
-    // Soil gradient based on SMAP moisture
-    const groundMoist = this.getTerrainAt(this.scrollX + this.drop.x).moisture;
-    const soilGrad = ctx.createLinearGradient(0, h * 0.5, 0, h);
-    soilGrad.addColorStop(0, groundMoist > 0.25 ? '#064e3b' : '#78350f');
-    soilGrad.addColorStop(1, '#1c1917');
-    ctx.fillStyle = soilGrad;
-    ctx.fill();
-
-    // Terrain Surface Lip
-    ctx.strokeStyle = groundMoist > 0.25 ? '#10b981' : '#b45309';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    // Water Droplet Player
-    ctx.save();
-    ctx.translate(this.drop.x, this.drop.y);
-    ctx.scale(1 / this.drop.squash, this.drop.squash);
-
-    ctx.fillStyle = '#38bdf8';
-    ctx.shadowColor = '#06b6d4';
-    ctx.shadowBlur = 18;
-    ctx.beginPath();
-    ctx.arc(0, 0, this.drop.size, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Droplet highlight shine
-    ctx.fillStyle = '#f8fafc';
-    ctx.beginPath();
-    ctx.arc(-4, -5, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Bottom Telemetry Card
-    const hudY = h - 96;
-    ctx.fillStyle = 'rgba(10, 15, 26, 0.9)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(24, hudY, 340, 72, 14);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#06b6d4';
-    ctx.font = 'bold 11px system-ui';
-    ctx.textAlign = 'left';
-    ctx.fillText('🛰️ NASA SMAP SOIL MOISTURE RADIOMETER', 38, hudY + 22);
-
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 13.5px system-ui';
-    ctx.fillText(`Volumetric Moisture: ${(groundMoist * 100).toFixed(1)}% (${groundMoist > 0.25 ? 'Moist Silt' : 'Arid Loam'})`, 38, hudY + 43);
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10.5px system-ui';
-    ctx.fillText('Press Space / Up to leap over parched clay gullies', 38, hudY + 60);
-
-    // Right: Restored Patches Progress
-    ctx.beginPath();
-    ctx.roundRect(w - 220, hudY, 196, 72, 14);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#10b981';
-    ctx.font = 'bold 15px system-ui';
-    ctx.textAlign = 'right';
-    ctx.fillText(`🌱 Patches: ${this.patchesRestored} / ${this.targetPatches}`, w - 42, hudY + 34);
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '600 11.5px system-ui';
-    ctx.fillText(`Distance: ${Math.floor(this.scrollX / 10)}m`, w - 42, hudY + 56);
-
-    // Victory Screen
-    if (this.isVictory) {
-      ctx.fillStyle = 'rgba(3, 7, 18, 0.88)';
-      ctx.fillRect(0, 0, w, h);
-      ctx.fillStyle = '#10b981';
-      ctx.font = '800 28px system-ui';
-      ctx.textAlign = 'center';
-      ctx.fillText('💧 ARID WATERSHED RESTORED! 💧', w / 2, h / 2 - 35);
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '500 14px system-ui';
-      ctx.fillText('You nourished 20 arid soil tracts back into fertile, blooming meadows.', w / 2, h / 2);
-      ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 16px system-ui';
-      ctx.fillText('🪙 +20 Zen Tokens Awarded', w / 2, h / 2 + 35);
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '12px system-ui';
-      ctx.fillText('Press Esc or Exit Game to return to the Arcade Hub', w / 2, h / 2 + 68);
-    }
-  }
-
-  start() {
-    this.isRunning = true;
-    this.isPaused = false;
-    this.lastTime = performance.now();
-    const loop = (t) => {
-      if (!this.isRunning) return;
-      if (!this.isPaused) {
-        this.update(Math.min(0.05, (t - this.lastTime) / 1000));
-        this.render();
-      }
-      this.lastTime = t;
-      this.rafId = requestAnimationFrame(loop);
-    };
-    this.rafId = requestAnimationFrame(loop);
-  }
-  pause() { this.isPaused = true; }
-  resume() { this.isPaused = false; this.lastTime = performance.now(); }
-  stop() {
-    this.isRunning = false;
-    this.isPaused = false;
-    if (this.rafId) cancelAnimationFrame(this.rafId);
-    window.removeEventListener('keydown', this.onKeyDown);
-  }
-}
 
 // ==========================================
 // 05. CLOUD COURIER (NASA OMI & GPM)
