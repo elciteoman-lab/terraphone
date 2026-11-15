@@ -16,6 +16,18 @@ export class SoundEngine {
     this.ambienceVolume = 0.70;
     this.lofiVolume = 0.0; // Lo-Fi starts at 0 (controlled by bottom-right slider)
 
+    // Granular Ambience Sub-layer Volumes (Wind, Habitat, Traffic, Honking, Animals, Birds, Voices)
+    this.granularVolumes = {
+      wind: 0.40,
+      habitat: 0.50,
+      traffic: 0.60,
+      horns: 0.35,
+      animals: 0.50,
+      birds: 0.50,
+      voices: 0.40
+    };
+    this.granularGains = {};
+
     // Audio Elements, Web Audio Sources & Gains
     this.audioElements = {};
     this.audioSources = {};
@@ -41,10 +53,17 @@ export class SoundEngine {
     this.citySoundTimer = null;
   }
 
+  getSharedContext() {
+    if (!this.sharedContext) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.sharedContext = new AudioCtx();
+    }
+    return this.sharedContext;
+  }
+
   init() {
     if (this.ctx) return;
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    this.ctx = new AudioCtx();
+    this.ctx = this.getSharedContext();
 
     // Master Destination Gain
     this.masterGain = this.ctx.createGain();
@@ -69,27 +88,54 @@ export class SoundEngine {
     this.subBassBoost.connect(this.distanceFilter);
     this.distanceFilter.connect(this.masterGain);
 
-    // Atmospheric Wind & Breeze Filter (620Hz Butterworth lowpass)
-    this.windFilter = this.ctx.createBiquadFilter();
-    this.windFilter.type = 'lowpass';
-    this.windFilter.frequency.setValueAtTime(620, this.ctx.currentTime);
-    this.windFilter.Q.setValueAtTime(0.707, this.ctx.currentTime);
-
-    this.windMaster = this.ctx.createGain();
-    this.windMaster.gain.setValueAtTime(1.0, this.ctx.currentTime);
-    this.windMaster.connect(this.windFilter);
-    this.windFilter.connect(this.rainMaster);
-
     // 2. THUNDER MASTER BUS (NASA Convective Storms)
     this.thunderMaster = this.ctx.createGain();
     this.thunderMaster.gain.setValueAtTime(this.thunderVolume, this.ctx.currentTime);
-    // Connect thunder to distance filter for atmospheric perspective
     this.thunderMaster.connect(this.distanceFilter);
 
     // 3. AMBIENCE MASTER BUS (Location-dependent: Urban / Rural / Jungle / Ocean)
     this.ambienceMaster = this.ctx.createGain();
     this.ambienceMaster.gain.setValueAtTime(0, this.ctx.currentTime);
     this.ambienceMaster.connect(this.masterGain);
+
+    // Habitat Base De-Hiss Filter (Warm Butterworth 2400Hz lowpass, eliminates tape hiss & white noise)
+    this.habitatFilter = this.ctx.createBiquadFilter();
+    this.habitatFilter.type = 'lowpass';
+    this.habitatFilter.frequency.setValueAtTime(2400, this.ctx.currentTime);
+    this.habitatFilter.Q.setValueAtTime(0.707, this.ctx.currentTime);
+
+    this.habitatMaster = this.ctx.createGain();
+    this.habitatMaster.gain.setValueAtTime(this.granularVolumes.habitat, this.ctx.currentTime);
+    this.habitatMaster.connect(this.habitatFilter);
+    this.habitatFilter.connect(this.ambienceMaster);
+    this.granularGains['habitat'] = this.habitatMaster;
+
+    // Organic Atmospheric Wind Shaper (Warm resonant 380Hz lowpass + high-shelf attenuation eliminating hiss)
+    this.windFilter = this.ctx.createBiquadFilter();
+    this.windFilter.type = 'lowpass';
+    this.windFilter.frequency.setValueAtTime(380, this.ctx.currentTime);
+    this.windFilter.Q.setValueAtTime(1.1, this.ctx.currentTime); // natural organic gust resonance
+
+    this.windShelf = this.ctx.createBiquadFilter();
+    this.windShelf.type = 'highshelf';
+    this.windShelf.frequency.setValueAtTime(1000, this.ctx.currentTime);
+    this.windShelf.gain.setValueAtTime(-14, this.ctx.currentTime); // eliminates high-frequency scratch
+
+    this.windMaster = this.ctx.createGain();
+    this.windMaster.gain.setValueAtTime(this.granularVolumes.wind, this.ctx.currentTime);
+    this.windMaster.connect(this.windFilter);
+    this.windFilter.connect(this.windShelf);
+    this.windShelf.connect(this.ambienceMaster);
+    this.granularGains['wind'] = this.windMaster;
+
+    // Other Granular Ambience sub-nodes
+    const layers = ['traffic', 'horns', 'animals', 'birds', 'voices'];
+    layers.forEach(layer => {
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(this.granularVolumes[layer], this.ctx.currentTime);
+      g.connect(this.ambienceMaster);
+      this.granularGains[layer] = g;
+    });
 
     // 4. LO-FI MASTER BUS
     this.lofiMaster = this.ctx.createGain();
@@ -102,21 +148,30 @@ export class SoundEngine {
     this.lofiMaster.connect(this.analyser);
     this.analyser.connect(this.masterGain);
 
-    // Load Rain & Wind Audio Tracks
+    // Load Rain Audio Tracks
     this.loadAudioTrack('rain_light', 'audio/rain_light.ogg', this.rainMaster);
     this.loadAudioTrack('rain_window', 'audio/rain_window.ogg', this.rainMaster);
     this.loadAudioTrack('rain_heavy', 'audio/rain_heavy.ogg', this.rainMaster);
     this.loadAudioTrack('storm_heavy', 'audio/storm_heavy.ogg', this.rainMaster);
+
+    // Load Wind Track into windMaster (controlled by dedicated wind slider)
     this.loadAudioTrack('wind_breeze', 'audio/wind_breeze.ogg', this.windMaster);
 
     // Load NASA Thunder Convective Track
     this.loadAudioTrack('rain_thunder', 'audio/rain_thunder.ogg', this.thunderMaster);
 
-    // Load Location Environment Ambience Tracks
-    this.loadAudioTrack('ambience_urban', 'audio/ambience_urban.ogg', this.ambienceMaster);
-    this.loadAudioTrack('ambience_rural', 'audio/ambience_rural.ogg', this.ambienceMaster);
-    this.loadAudioTrack('ambience_jungle', 'audio/ambience_jungle.ogg', this.ambienceMaster);
-    this.loadAudioTrack('ambience_ocean', 'audio/ambience_ocean.ogg', this.ambienceMaster);
+    // Load Location Environment Habitat Tracks into habitatMaster (de-hissed & controlled by habitat slider)
+    this.loadAudioTrack('ambience_urban', 'audio/ambience_urban.ogg', this.habitatMaster);
+    this.loadAudioTrack('ambience_rural', 'audio/ambience_rural.ogg', this.habitatMaster);
+    this.loadAudioTrack('ambience_jungle', 'audio/ambience_jungle.ogg', this.habitatMaster);
+    this.loadAudioTrack('ambience_ocean', 'audio/ambience_ocean.ogg', this.habitatMaster);
+
+    // Load Granular Ambience Tracks into their dedicated gain nodes
+    this.loadAudioTrack('granular_traffic', 'audio/traffic.ogg', this.granularGains['traffic']);
+    this.loadAudioTrack('granular_horns', 'audio/horns.ogg', this.granularGains['horns']);
+    this.loadAudioTrack('granular_animals', 'audio/nature.ogg', this.granularGains['animals']);
+    this.loadAudioTrack('granular_birds', 'audio/ambience_jungle.ogg', this.granularGains['birds']);
+    this.loadAudioTrack('granular_voices', 'audio/crowd.ogg', this.granularGains['voices']);
 
     // Load Lo-Fi Chillhop Track (Clean chillhop beat with zero rain baked in)
     this.loadAudioTrack('lofi_beat', 'audio/lofi_cloud_watching.ogg', this.lofiMaster);
@@ -216,10 +271,10 @@ export class SoundEngine {
       stormVol = Math.min(1.0, Math.max(0, (r - 10.0) / 16.0));
     }
 
-    // 5. Atmospheric Forest Breeze
+    // 5. Atmospheric Forest Breeze (Wind)
     let breezeVol = 0;
-    if (r >= 2.0) {
-      breezeVol = Math.min(0.72, Math.max(0, (r - 2.0) / 16.0));
+    if (r >= 2.0 && this.granularVolumes.wind > 0.001) {
+      breezeVol = Math.min(0.72, Math.max(0, (r - 2.0) / 16.0)) * this.granularVolumes.wind;
     }
 
     // 6. Rolling Convective Thunder (NASA convective storm threshold: r > 12 mm/hr)
@@ -261,20 +316,56 @@ export class SoundEngine {
 
     const activeTrackKey = envMap[this.currentEnv] || 'ambience_rural';
 
-    // Play active ambience audio track
-    if (audible) {
-      const activeEl = this.audioElements[activeTrackKey];
+    // Play active habitat audio track only if habitat volume is active
+    const activeEl = this.audioElements[activeTrackKey];
+    if (audible && this.granularVolumes.habitat > 0.001) {
       if (activeEl && activeEl.paused) {
         activeEl.play().catch(() => {});
       }
+    } else {
+      if (activeEl && !activeEl.paused) {
+        activeEl.pause();
+      }
     }
 
-    // Smoothly cross-fade all 4 ambience tracks
+    // Smoothly cross-fade all 4 habitat tracks
     Object.entries(envMap).forEach(([type, trackKey]) => {
       const gainNode = this.gains[trackKey];
       if (!gainNode) return;
-      const targetGain = (audible && type === this.currentEnv) ? 1.0 : 0.0;
-      gainNode.gain.setTargetAtTime(targetGain, now, 0.6); // 600ms organic crossfade
+      const targetGain = (audible && type === this.currentEnv && this.granularVolumes.habitat > 0.001) ? 1.0 : 0.0;
+      gainNode.gain.setTargetAtTime(targetGain, now, 0.5);
+    });
+
+    // Wind track playback and gain
+    const windEl = this.audioElements['wind_breeze'];
+    const windGain = this.gains['wind_breeze'];
+    if (audible && this.granularVolumes.wind > 0.001) {
+      if (windEl && windEl.paused) windEl.play().catch(() => {});
+      if (windGain) windGain.gain.setTargetAtTime(1.0, now, 0.4);
+    } else {
+      if (windGain) windGain.gain.setTargetAtTime(0, now, 0.2);
+      if (windEl && !windEl.paused) windEl.pause();
+    }
+
+    // Play/Pause and crossfade granular ambience sub-tracks
+    const granularTracks = [
+      { id: 'granular_traffic', volKey: 'traffic' },
+      { id: 'granular_horns', volKey: 'horns' },
+      { id: 'granular_animals', volKey: 'animals' },
+      { id: 'granular_birds', volKey: 'birds' },
+      { id: 'granular_voices', volKey: 'voices' }
+    ];
+    granularTracks.forEach(({ id, volKey }) => {
+      const el = this.audioElements[id];
+      const gainNode = this.gains[id];
+      const hasVol = this.granularVolumes[volKey] > 0.001;
+      if (audible && hasVol) {
+        if (el && el.paused) el.play().catch(() => {});
+        if (gainNode) gainNode.gain.setTargetAtTime(1.0, now, 0.4);
+      } else {
+        if (gainNode) gainNode.gain.setTargetAtTime(0, now, 0.2);
+        if (el && !el.paused) el.pause();
+      }
     });
   }
 
@@ -847,6 +938,77 @@ export class SoundEngine {
     this.ambienceVolume = Math.max(0, Math.min(1, v));
     if (this.ctx && this.ambienceMaster && !this.isMuted) {
       this.ambienceMaster.gain.setTargetAtTime(this.ambienceVolume, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  setWindVolume(v) {
+    this.granularVolumes.wind = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.wind) {
+      this.granularGains.wind.gain.setTargetAtTime(this.granularVolumes.wind, this.ctx.currentTime, 0.05);
+    }
+    const windEl = this.audioElements['wind_breeze'];
+    if (this.granularVolumes.wind <= 0.001) {
+      if (this.gains['wind_breeze']) this.gains['wind_breeze'].gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+      if (windEl && !windEl.paused) {
+        setTimeout(() => { if (this.granularVolumes.wind <= 0.001 && windEl) windEl.pause(); }, 150);
+      }
+    } else if (this.isPlaying && !this.isMuted) {
+      if (windEl && windEl.paused) windEl.play().catch(() => {});
+      if (this.gains['wind_breeze']) this.gains['wind_breeze'].gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  setHabitatVolume(v) {
+    this.granularVolumes.habitat = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.habitat) {
+      this.granularGains.habitat.gain.setTargetAtTime(this.granularVolumes.habitat, this.ctx.currentTime, 0.05);
+    }
+    const envMap = { urban: 'ambience_urban', rural: 'ambience_rural', jungle: 'ambience_jungle', ocean: 'ambience_ocean' };
+    const activeTrackKey = envMap[this.currentEnv] || 'ambience_rural';
+    const activeEl = this.audioElements[activeTrackKey];
+    if (this.granularVolumes.habitat <= 0.001) {
+      if (this.gains[activeTrackKey]) this.gains[activeTrackKey].gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+      if (activeEl && !activeEl.paused) {
+        setTimeout(() => { if (this.granularVolumes.habitat <= 0.001 && activeEl) activeEl.pause(); }, 150);
+      }
+    } else if (this.isPlaying && !this.isMuted) {
+      if (activeEl && activeEl.paused) activeEl.play().catch(() => {});
+      if (this.gains[activeTrackKey]) this.gains[activeTrackKey].gain.setTargetAtTime(1.0, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  setTrafficVolume(v) {
+    this.granularVolumes.traffic = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.traffic) {
+      this.granularGains.traffic.gain.setTargetAtTime(this.granularVolumes.traffic, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setHornsVolume(v) {
+    this.granularVolumes.horns = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.horns) {
+      this.granularGains.horns.gain.setTargetAtTime(this.granularVolumes.horns, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setAnimalsVolume(v) {
+    this.granularVolumes.animals = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.animals) {
+      this.granularGains.animals.gain.setTargetAtTime(this.granularVolumes.animals, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setBirdsVolume(v) {
+    this.granularVolumes.birds = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.birds) {
+      this.granularGains.birds.gain.setTargetAtTime(this.granularVolumes.birds, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setVoicesVolume(v) {
+    this.granularVolumes.voices = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.voices) {
+      this.granularGains.voices.gain.setTargetAtTime(this.granularVolumes.voices, this.ctx.currentTime, 0.05);
     }
   }
 

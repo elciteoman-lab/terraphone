@@ -4,33 +4,40 @@
  */
 
 :root {
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+  --font: 'Overpass', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: 'Fira Sans', 'Overpass', -apple-system, BlinkMacSystemFont, sans-serif;
   --radius-pill: 9999px;
   --radius-card: 20px;
   --radius-sm: 10px;
   --trans-smooth: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
   --trans-fast: all 0.12s ease;
 
-  /* Default theme fallback (Dark Theme) */
-  --bg: #06080e;
-  --panel-bg: rgba(13, 18, 30, 0.78);
-  --panel-bg-hover: rgba(18, 24, 40, 0.92);
-  --panel-border: rgba(255, 255, 255, 0.095);
-  --panel-border-focus: rgba(56, 189, 248, 0.5);
-  --text-main: #f1f5f9;
+  /* Official NASA Space Apps Challenge Palette (spaceappschallenge.org/brand) */
+  --space-apps-blue: #1B2B85;
+  --space-apps-yellow: #E7F434;
+  --space-apps-cinder: #151622;
+  --space-apps-deep: #0c0e18;
+
+  /* Default theme fallback (Dark Deep Space Theme) */
+  --bg: #0c0e18;
+  --panel-bg: rgba(21, 22, 34, 0.85);
+  --panel-bg-hover: rgba(27, 43, 133, 0.45);
+  --panel-border: rgba(231, 244, 52, 0.16);
+  --panel-border-focus: rgba(231, 244, 52, 0.65);
+  --text-main: #f8fafc;
   --text-sub: #94a3b8;
   --text-muted: #64748b;
-  --accent: #38bdf8;
-  --accent-glow: rgba(56, 189, 248, 0.35);
-  --accent-soft: rgba(56, 189, 248, 0.15);
-  --accent-contrast: #031422;
-  --shadow-hud: 0 14px 40px rgba(0, 0, 0, 0.6), 0 1px 2px rgba(255, 255, 255, 0.05);
-  --shadow-popup: 0 24px 55px rgba(0, 0, 0, 0.8);
+  --accent: #E7F434; /* Official Space Apps Neon Yellow */
+  --accent-glow: rgba(231, 244, 52, 0.40);
+  --accent-soft: rgba(231, 244, 52, 0.14);
+  --accent-contrast: #0c0e18;
+  --shadow-hud: 0 14px 40px rgba(0, 0, 0, 0.65), 0 1px 2px rgba(231, 244, 52, 0.08);
+  --shadow-popup: 0 24px 55px rgba(0, 0, 0, 0.85);
   --gauge-bg: rgba(255, 255, 255, 0.08);
   --tag-bg: rgba(255, 255, 255, 0.06);
   --slider-track: rgba(255, 255, 255, 0.12);
-  --modal-overlay: rgba(3, 5, 10, 0.78);
-  --panel-bg-glass: rgba(13, 18, 30, 0.78);
+  --modal-overlay: rgba(12, 14, 24, 0.85);
+  --panel-bg-glass: rgba(21, 22, 34, 0.85);
 }
 
 /* Light Theme Variables */
@@ -96,6 +103,11 @@ html, body {
   line-height: 1.5;
   user-select: none;
   -webkit-user-select: none;
+}
+
+h1, h2, h3, h4, .brand-title, .modal-title {
+  font-family: var(--font-heading);
+  letter-spacing: -0.01em;
 }
 
 /* Map Canvas Container */
@@ -210,6 +222,48 @@ html[data-theme="light"] #stars-canvas {
   background: var(--accent-soft);
 }
 
+.badge-space-apps {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(27, 43, 133, 0.45);
+  border: 1px solid rgba(231, 244, 52, 0.35);
+  color: var(--space-apps-yellow);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: var(--trans-fast);
+  white-space: nowrap;
+}
+
+.badge-space-apps:hover {
+  background: rgba(27, 43, 133, 0.75);
+  box-shadow: 0 0 14px rgba(231, 244, 52, 0.35);
+  border-color: var(--space-apps-yellow);
+  transform: translateY(-1px);
+}
+
+.space-apps-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--space-apps-yellow);
+  box-shadow: 0 0 8px var(--space-apps-yellow);
+}
+
+.space-apps-orbit-icon {
+  flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.brand-wrapper:hover .space-apps-orbit-icon {
+  transform: rotate(20deg) scale(1.08);
+}
+
 .dot {
   width: 7px;
   height: 7px;
@@ -223,15 +277,17 @@ html[data-theme="light"] #stars-canvas {
   box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
 }
 
-/* Top Center: Sleek Search Capsule */
+/* Bottom Center: Sleek Search Capsule */
 #hud-top-center {
-  top: 18px;
+  bottom: 20px;
+  top: auto;
   left: 50%;
   transform: translateX(-50%);
-  width: min(360px, 28vw);
+  width: min(380px, 28vw);
   padding: 0;
   border-radius: var(--radius-pill);
   box-shadow: var(--shadow-hud);
+  z-index: 25;
 }
 
 .search-container {
@@ -279,10 +335,11 @@ html[data-theme="light"] #stars-canvas {
   pointer-events: none;
 }
 
-/* Autocomplete Suggestions Dropdown */
+/* Autocomplete Suggestions Dropdown (pops upwards from bottom searchbar) */
 .search-suggestions {
   position: absolute;
-  top: calc(100% + 8px);
+  bottom: calc(100% + 8px);
+  top: auto;
   left: 0;
   right: 0;
   background: var(--panel-bg);
@@ -858,6 +915,133 @@ html[data-theme="light"] #stars-canvas {
   box-shadow: 0 0 8px var(--accent-glow);
   cursor: pointer;
   transition: transform 0.1s ease;
+}
+
+/* Granular Ambience Mixer & Dropdown */
+.mixer-group-ambience {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.mixer-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.ambience-dropdown-btn {
+  background: var(--tag-bg);
+  border: 1px solid var(--panel-border);
+  color: var(--text-sub);
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: var(--trans-fast);
+}
+
+.ambience-dropdown-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.ambience-dropdown-btn .dropdown-chevron {
+  transition: transform 0.2s ease;
+}
+
+.ambience-dropdown-btn.open .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.ambience-dropdown-menu {
+  display: none;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  backdrop-filter: blur(16px);
+  margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.ambience-dropdown-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ambience-dropdown-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ambience-dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.ambience-dropdown-menu.open {
+  display: flex;
+}
+
+.submixer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.submixer-label {
+  font-size: 11px;
+  color: var(--text-sub);
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 66px;
+}
+
+.submixer-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--slider-track);
+  outline: none;
+  cursor: pointer;
+}
+
+.submixer-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+  cursor: pointer;
+}
+
+.submixer-val {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-family: monospace;
+  min-width: 30px;
+  text-align: right;
+  transition: color 0.15s ease;
+}
+
+.submixer-val.is-off {
+  color: #f87171;
 }
 
 .mixer-slider::-webkit-slider-thumb:hover {
@@ -1459,6 +1643,136 @@ body.zen-mode .exit-zen-btn {
   background: var(--tag-bg);
 }
 
+/* Game Briefing & Environmental Intro Card */
+.arcade-briefing-dialog {
+  max-width: 580px;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65);
+}
+
+.briefing-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.briefing-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.briefing-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.briefing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid var(--panel-border);
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.briefing-section-science {
+  background: rgba(5, 150, 105, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.briefing-section-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.briefing-section-science .briefing-section-title {
+  color: #34d399;
+}
+
+.briefing-text {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-sub);
+  margin: 0;
+}
+
+.briefing-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 6px 12px;
+}
+
+.briefing-control-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.briefing-kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--tag-bg);
+  border: 1px solid var(--panel-border);
+  padding: 2px 7px;
+  border-radius: 5px;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.briefing-control-desc {
+  color: var(--text-sub);
+}
+
+.briefing-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.briefing-btn {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: var(--trans-fast);
+}
+
+.briefing-btn-secondary {
+  background: transparent;
+  color: var(--text-sub);
+  border: 1px solid var(--panel-border);
+}
+
+.briefing-btn-secondary:hover {
+  background: var(--tag-bg);
+  color: var(--text-main);
+}
+
+.briefing-btn-primary {
+  background: var(--accent);
+  color: #030712;
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.briefing-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 22px var(--accent-glow);
+}
+
 .modal-content {
   font-size: 13.5px;
   color: var(--text-sub);
@@ -1511,7 +1825,8 @@ body.zen-mode .exit-zen-btn {
 
 @media (max-width: 1500px) {
   #hud-top-center {
-    top: 76px;
+    bottom: 20px;
+    top: auto;
     left: 50%;
     transform: translateX(-50%);
     width: min(460px, 90vw);
@@ -1569,14 +1884,15 @@ body.zen-mode .exit-zen-btn {
     display: none !important;
   }
 
-  /* Search capsule fits cleanly below topbar without blocking the globe */
+  /* Search capsule fits cleanly at bottom without blocking mobile status pill */
   #hud-top-center {
-    top: 56px;
-    left: 10px;
-    right: 10px;
+    bottom: 58px;
+    top: auto;
+    left: 12px;
+    right: 12px;
     transform: none;
     width: auto;
-    height: 36px;
+    height: 38px;
   }
   .search-container {
     height: 36px;
@@ -1801,9 +2117,10 @@ body.zen-mode .exit-zen-btn {
     display: none !important;
   }
 
-  /* Centered search in landscape to prevent any capsule collisions */
+  /* Centered search at bottom in landscape to prevent any capsule collisions */
   #hud-top-center {
-    top: 6px;
+    bottom: 8px;
+    top: auto;
     left: 50%;
     transform: translateX(-50%);
     width: min(300px, 42vw);

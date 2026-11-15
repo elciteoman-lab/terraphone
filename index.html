@@ -2,214 +2,126 @@
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Terraphone — Live Global Rain, Thunder & Sound of Change | NASA Space Apps Challenge</title>
   <meta name="description" content="Terraphone: Immersive global rain, thunder and atmospheric sound simulator powered by NASA GPM IMERG and NASA SVS 5650, plus The Sound of Change urban noise intervention simulator.">
 
+  <script>
+    try {
+      if (!location.hash && !matchMedia('(prefers-reduced-motion: reduce)').matches && !sessionStorage.getItem('terraphone-arrival-orbit')) {
+        document.documentElement.classList.add('first-arrival');
+        sessionStorage.setItem('terraphone-arrival-orbit', '1');
+      }
+    } catch {}
+  </script>
   <!-- MapLibre GL v5 CDN -->
   <link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/dist/maplibre-gl.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/dist/maplibre-gl.js"></script>
-
-  <!-- Google Fonts: Inter -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-
-  <!-- Error Diagnostic Reporter -->
-  <script>
-    window.onerror = function(msg, url, line, col, err) {
-      console.error('[App Error]', msg, line, col, err);
-      fetch('/log?err=' + encodeURIComponent(msg + ' (' + line + ':' + col + ')'));
-    };
-    window.addEventListener('unhandledrejection', function(e) {
-      console.error('[Unhandled Rejection]', e.reason);
-      fetch('/log?err=' + encodeURIComponent('Rejection: ' + (e.reason && e.reason.message || e.reason)));
-    });
-  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.0.0/dist/maplibre-gl.js"></script>
 
   <!-- Application Stylesheets -->
   <link href="css/style.css" rel="stylesheet">
   <link href="css/sound-of-change.css" rel="stylesheet">
   <link href="css/arcade.css" rel="stylesheet">
+  <link href="css/calm-ui.css" rel="stylesheet">
 </head>
-<body>
+<body data-experience="rain">
 
-  <!-- 3D Bumpy Globe Map Container -->
-  <div id="map"></div>
-  <div id="lightning-overlay" class="lightning-flash-overlay"></div>
-  <div class="stars-overlay" id="stars-overlay">
-    <canvas id="stars-canvas"></canvas>
-  </div>
-
-  <!-- ==========================================
-       TOP LEFT: BRAND & NASA SVS 5650 CAPSULE
-       ========================================== -->
-  <header class="hud-capsule" id="hud-top-left">
-    <div class="brand-wrapper" id="btn-brand" title="Terraphone — NASA Space Apps Challenge">
-      <span class="brand-title">Terra<span>phone</span></span>
+  <div class="arrival" aria-hidden="true">
+    <div class="arrival-lockup">
+      <div class="arrival-symbol">
+        <svg class="arrival-orbit" width="112" height="112" viewBox="0 0 112 112" fill="none" aria-hidden="true">
+          <g transform="rotate(-23 56 56)">
+            <circle cx="56" cy="56" r="30" stroke="currentColor" stroke-width="2.4"/>
+            <path d="M56 26c-17 9-19 49 0 60m0-60c17 9 19 49 0 60M28 46c14-8 42-8 56 0M28 66c14 8 42 8 56 0" stroke="currentColor" stroke-width="1.55"/>
+            <path d="M28 48C9 51 4 57 9 61c8 8 39 8 63 3 23-5 36-12 32-17-2-3-10-4-18-4" stroke="#131d1b" stroke-width="6" stroke-linecap="round"/>
+            <path d="M28 48C9 51 4 57 9 61c8 8 39 8 63 3 23-5 36-12 32-17-2-3-10-4-18-4" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/>
+            <circle cx="95" cy="43.5" r="4" fill="#f8ac6c" stroke="#131d1b" stroke-width="1.4"/>
+          </g>
+        </svg>
+      </div>
+      <span class="arrival-word">terraphone</span>
     </div>
-    <a href="https://svs.gsfc.nasa.gov/5650" target="_blank" rel="noopener noreferrer" class="badge-gpm" title="NASA SVS 5650: Near Real-Time Global Precipitation from the GPM Constellation">
-      <span id="connection-dot" class="dot"></span>
-      <span>NASA SVS 5650</span>
-    </a>
+  </div>
+  <script>
+    if (document.documentElement.classList.contains('first-arrival')) {
+      const arrival = document.querySelector('.arrival');
+      const listeners = new AbortController();
+      const finish = () => {
+        document.documentElement.classList.remove('first-arrival');
+        listeners.abort();
+        arrival.remove();
+      };
+      for (const event of ['pointerdown', 'keydown', 'wheel']) {
+        window.addEventListener(event, finish, { once: true, passive: true, signal: listeners.signal });
+      }
+      const end = event => { if (event.target === arrival) finish(); };
+      arrival.addEventListener('animationend', end, { signal: listeners.signal });
+      arrival.addEventListener('animationcancel', end, { signal: listeners.signal });
+    }
+  </script>
+  <!-- 3D Bumpy Globe Map Container -->
+  <div id="map" role="region" aria-label="Interactive Earth globe. Drag to explore, scroll to zoom, and select a place to listen."></div>
+  <div id="lightning-overlay" class="lightning-flash-overlay"></div>
+  <header id="hud-top-left" class="hud-capsule">
+    <h1><button type="button" id="btn-brand" aria-label="Terraphone home">terraphone</button></h1>
   </header>
 
-  <!-- ==========================================
-       TOP CENTER: SLEEK SEARCHBAR CAPSULE
-       ========================================== -->
-  <div class="hud-capsule" id="hud-top-center">
-    <div class="search-container">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="11" cy="11" r="8"></circle>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-      <input type="text" id="search-input" class="search-input" placeholder="Search city, storm, or coordinates..." autocomplete="off" spellcheck="false">
-      <span class="search-kbd">/</span>
+  <nav id="hud-top-right" class="hud-capsule" aria-label="Explore">
+    <details class="explore-menu" id="explore-menu">
+      <summary id="btn-explore" aria-label="Explore experiences and settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="3" width="6" height="6" rx="1.5"/><rect x="3" y="15" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/></svg>
+        <span>Explore</span>
+        <svg class="explore-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="explore-panel">
+        <div id="place-search" class="rain-only" role="search">
+          <div class="search-container">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg>
+            <input type="text" id="search-input" class="search-input" placeholder="Search places" aria-label="Search for a city or storm" autocomplete="off" spellcheck="false">
+            <kbd class="search-kbd" aria-hidden="true">/</kbd>
+          </div>
+          <div id="search-suggestions" class="search-suggestions"></div>
+        </div>
+        <button type="button" id="btn-global-rain" aria-current="page">Global Rain</button>
+        <button type="button" id="btn-sound-of-change">Sound of Change <kbd>C</kbd></button>
+        <button type="button" id="btn-arcade">Earth Arcade <kbd>A</kbd></button>
+        <hr>
+        <button type="button" id="btn-heaviest" class="rain-only">Find heaviest rain <kbd>S</kbd></button>
+        <button type="button" id="btn-leaderboard">City noise index</button>
+        <button type="button" id="btn-token-shop">Zen collection <span id="hud-token-count"></span></button>
+        <button type="button" id="btn-info">Science &amp; sources</button>
+        <hr>
+        <button type="button" id="btn-hide-ui" class="rain-only" aria-pressed="false">Zen view <kbd>H</kbd></button>
+        <button type="button" id="btn-theme">Theme <span id="theme-label">Auto</span></button>
+        <button type="button" id="btn-fullscreen" aria-pressed="false">Fullscreen</button>
+      </div>
+    </details>
+  </nav>
 
-      <!-- Autocomplete Dropdown -->
-      <div id="search-suggestions" class="search-suggestions"></div>
-    </div>
-  </div>
-
-  <!-- ==========================================
-       TOP RIGHT: THEME, LO-FI & ACTIONS CAPSULE
-       ========================================== -->
-  <div class="hud-capsule" id="hud-top-right">
-    <!-- Theme Toggle (Auto / Dark / Light) -->
-    <button id="btn-theme" class="hud-btn" title="Theme (Auto / Dark / Light)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="5"></circle>
-        <line x1="12" y1="1" x2="12" y2="3"></line>
-        <line x1="12" y1="21" x2="12" y2="23"></line>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-        <line x1="1" y1="12" x2="3" y2="12"></line>
-        <line x1="21" y1="12" x2="23" y2="12"></line>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-      </svg>
-      <span id="theme-label">Auto</span>
-    </button>
-
-    <!-- Global Noise Leaderboard Button (Clean single trophy icon) -->
-    <button id="btn-leaderboard" class="hud-btn" title="Global Urban Noise Pollution Leaderboard (UNEP / WHO)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
-        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
-        <path d="M4 22h16"></path>
-        <path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-2.34"></path>
-        <path d="M18 14.66V17c0 .55-.45 1-1 1h-2c-.55 0-1-.45-1-1v-2.34"></path>
-        <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
-      </svg>
-      <span>Noise Rank</span>
-    </button>
-
-    <!-- The Sound of Change Urban Simulation Button (NASA S2L) -->
-    <button id="btn-sound-of-change" class="hud-btn" title="The Sound of Change: Urban Noise & Interventions (Hotkey C)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-      </svg>
-      <span>Sound of Change</span>
-    </button>
-
-    <!-- Earth Arcade Button (NASA Environmental Games · Hotkey A) -->
-    <button id="btn-arcade" class="hud-btn" title="Earth Arcade: 8 Environmental Exploration Games (Hotkey A)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="2" y="6" width="20" height="12" rx="2"></rect>
-        <path d="M6 12h4m-2-2v4"></path>
-        <line x1="15" y1="11" x2="15" y2="11.01"></line>
-        <line x1="18" y1="13" x2="18" y2="13.01"></line>
-      </svg>
-      <span>Arcade</span>
-    </button>
-
-    <!-- Zen Tokens & Cosmetic Shop Button -->
-    <button id="btn-token-shop" class="hud-btn btn-token-vault" title="Zen Tokens & Cosmetic Shop (Click to open Skin Vault)">
-      <span class="token-vault-icon">🪙</span>
-      <span id="hud-token-count">15 Tokens</span>
-    </button>
-
-    <!-- Mobile Mixer Drawer Toggle Button -->
-    <button id="btn-mobile-mixer" class="hud-btn mobile-only" title="Audio Mixer & Relief Controls" aria-label="Audio Mixer">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="4" y1="21" x2="4" y2="14"></line>
-        <line x1="4" y1="10" x2="4" y2="3"></line>
-        <line x1="12" y1="21" x2="12" y2="12"></line>
-        <line x1="12" y1="8" x2="12" y2="3"></line>
-        <line x1="20" y1="21" x2="20" y2="16"></line>
-        <line x1="20" y1="12" x2="20" y2="3"></line>
-        <line x1="1" y1="14" x2="7" y2="14"></line>
-        <line x1="9" y1="8" x2="15" y2="8"></line>
-        <line x1="17" y1="16" x2="23" y2="16"></line>
-      </svg>
-      <span>Mixer</span>
-    </button>
-
-    <!-- Fly to Heaviest Rain Button -->
-    <button id="btn-heaviest" class="hud-btn btn-heaviest" title="Find & Fly to the Heaviest Rain on Earth right now (live NASA GPM · Hotkey S)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
-        <path d="M13 13l-3 5h4l-2 5"></path>
-      </svg>
-      <span>⚡ Heaviest</span>
-    </button>
-
-    <!-- Play/Pause Button -->
-    <button id="btn-listen" class="hud-btn" title="Listen / Pause (Spacebar)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+  <nav class="hud-capsule rain-only" id="listening-dock" aria-label="Soundscape controls">
+    <button id="btn-listen" type="button" title="Listen / Pause (Space)" aria-label="Listen to the selected location" aria-pressed="false">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+        <path class="play-symbol" d="M4 2.5 13 8l-9 5.5z"/>
+        <path class="pause-symbol" d="M3 3h3v10H3zm7 0h3v10h-3z"/>
       </svg>
       <span>Listen</span>
     </button>
-
-    <!-- Zen Mode Hide UI Button -->
-    <button id="btn-hide-ui" class="hud-btn" title="Zen View: Hide UI (Hotkey H)">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-        <circle cx="12" cy="12" r="3"></circle>
-      </svg>
+    <button id="btn-mobile-mixer" type="button" title="Sound settings" aria-label="Sound settings" aria-controls="hud-bottom-right" aria-expanded="false">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M4 7h8m4 0h4M4 17h3m4 0h9"/><circle cx="14" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
     </button>
+  </nav>
 
-    <!-- Fullscreen Toggle Button -->
-    <button id="btn-fullscreen" class="hud-btn" title="Toggle Fullscreen (F11)">
-      <svg id="fullscreen-icon-expand" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-      </svg>
-      <svg id="fullscreen-icon-compress" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
-      </svg>
-    </button>
+  <footer class="rain-only" id="scene-footer">
+    <a href="https://www.spaceappschallenge.org/" target="_blank" rel="noopener noreferrer" class="mission-credit"><span class="mission-orbit" aria-hidden="true">✧</span> NASA Space Apps Challenge <span class="credit-year">2026</span></a>
+  </footer>
 
-    <!-- Info / Mission Modal Button -->
-    <button id="btn-info" class="hud-btn" title="About NASA SVS 5650 & Science">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="16" x2="12" y2="12"></line>
-        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-      </svg>
-    </button>
-  </div>
-
-  <!-- ==========================================
-       BOTTOM LEFT: LIVE RAIN & GAUGE CARD
-       ========================================== -->
-  <div class="hud-capsule" id="hud-bottom-left">
-    <!-- Compact Mobile Status Pill Header (Visible on Mobile) -->
-    <div class="hud-mobile-pill-header" id="hud-mobile-pill-header">
-      <div class="mobile-pill-summary">
-        <span id="mobile-pill-icon">🌧️</span>
-        <span id="mobile-pill-rate">— mm/h</span>
-        <span class="mobile-pill-sep">·</span>
-        <span id="mobile-pill-loc">Atlantic Ocean</span>
-      </div>
-      <button class="mobile-pill-toggle" id="btn-toggle-hud" aria-label="Toggle details">
-        <svg class="chevron-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 15l-6-6-6 6"/></svg>
-      </button>
-    </div>
-
-    <!-- Main Card Body -->
-    <div class="hud-desktop-body" id="hud-desktop-body">
+  <details id="rain-readout" class="rain-only" hidden>
+    <summary title="Rain details">
+      <span id="reading-location"></span>
+      <span id="reading-rate"></span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
+    </summary>
+    <div id="rain-details">
       <div class="hud-card-top">
         <span id="hud-status" class="hud-status-badge">CLICK TO LISTEN</span>
         <span id="hud-location" class="hud-location-name">Atlantic Ocean</span>
@@ -221,45 +133,36 @@
       </div>
 
       <!-- Rain Type Indicator with Hover Infocard Trigger -->
-      <div id="hud-rain-indicator" class="hud-rain-indicator" title="Hover for deep meteorological infocard">
-        <span id="hud-rain-type">🌧️ <span>Sampling live rain...</span></span>
-      </div>
+      <button type="button" id="hud-rain-indicator" class="hud-rain-indicator" aria-controls="rain-infocard" aria-expanded="false" title="Rain science">
+        <span id="hud-rain-type">🌧️ <span>Select a place to sample rain</span></span>
+      </button>
 
       <!-- Acoustic Habitat Ambience Badge -->
       <div id="hud-env-tag" class="hud-env-tag" title="Local habitat ambience: Urban traffic, rural insects, jungle wildlife, or ocean surf">
-        <span id="hud-env-icon">🏙️</span>
-        <span id="hud-env-label">Urban Ambience</span>
+        <span id="hud-env-icon">🌊</span>
+        <span id="hud-env-label">Ocean Swell</span>
       </div>
 
       <!-- Urban Noise Pollution Index Badge (Interactive Flashcard Trigger) -->
-      <div id="hud-noise-badge" class="hud-noise-badge" style="display:none;" title="Click for Urban Noise Ecology & Nature Protection Flashcard">
+      <button type="button" id="hud-noise-badge" class="hud-noise-badge" style="display:none;" title="Click for Urban Noise Ecology & Nature Protection Flashcard">
         <span class="noise-icon">🔊</span>
         <span id="hud-noise-text">Noise Index: #1 Dhaka (119 dB)</span>
         <span class="noise-arrow">→</span>
-      </div>
+      </button>
 
       <!-- Animated Logarithmic Rain Intensity Gauge -->
       <div class="rain-gauge">
         <div id="rain-gauge-fill" class="rain-gauge-fill"></div>
       </div>
 
-      <!-- Floating Scientific Infocard (Revealed on Hover) -->
       <div id="rain-infocard" class="rain-infocard"></div>
     </div>
-  </div>
+  </details>
 
-
-  <!-- ==========================================
-       BOTTOM RIGHT: AUDIO MIXER & BUMPY GLOBE
-       ========================================== -->
-  <div class="hud-capsule" id="hud-bottom-right">
-    <!-- Mobile Drawer Header -->
-    <div class="mixer-mobile-header" id="mixer-mobile-header">
-      <div class="mixer-drawer-handle"></div>
-      <div class="mixer-drawer-title-row">
-        <span class="mixer-drawer-title">🎛️ Soundscape & Relief</span>
-        <button id="btn-close-mixer" class="mixer-close-btn" aria-label="Close mixer">✕</button>
-      </div>
+  <section class="hud-capsule rain-only" id="hud-bottom-right" aria-label="Sound settings">
+    <div class="mixer-drawer-title-row">
+      <span class="mixer-drawer-title">Sound settings</span>
+      <button type="button" id="btn-close-mixer" class="mixer-close-btn" aria-label="Close sound settings">×</button>
     </div>
     <!-- Rain Volume -->
     <div class="mixer-group">
@@ -267,7 +170,7 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
         <span>Rain</span>
       </span>
-      <input type="range" id="slider-rain-vol" class="mixer-slider" min="0" max="1" step="0.01" value="0.85" title="Rain Droplets & Downpour Volume">
+      <input type="range" id="slider-rain-vol" aria-label="Rain volume" class="mixer-slider" min="0" max="1" step="0.01" value="0.85" title="Rain Droplets & Downpour Volume">
     </div>
 
     <!-- Thunder Volume (NASA Convective Storms) -->
@@ -276,16 +179,61 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         <span>Thunder</span>
       </span>
-      <input type="range" id="slider-thunder-vol" class="mixer-slider" min="0" max="1" step="0.01" value="0.80" title="NASA Convective Thunder & Lightning Rumble Volume">
+      <input type="range" id="slider-thunder-vol" aria-label="Thunder volume" class="mixer-slider" min="0" max="1" step="0.01" value="0.80" title="NASA Convective Thunder & Lightning Rumble Volume">
     </div>
 
-    <!-- Location-Dependent Ambience (Human / Animal / Ocean) -->
-    <div class="mixer-group">
-      <span class="mixer-label">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12s1.5-2 4-2 4 2 4 2"/><path d="M9 15c.5.5 1.5 1 3 1s2.5-.5 3-1"/></svg>
-        <span>Ambience</span>
-      </span>
-      <input type="range" id="slider-ambience-vol" class="mixer-slider" min="0" max="1" step="0.01" value="0.70" title="Location Ambience Volume (Urban, Rural, Wildlife, Ocean)">
+    <!-- Location-Dependent Ambience (Granular Sub-Layers Dropdown) -->
+    <div class="mixer-group mixer-group-ambience" id="mixer-group-ambience">
+      <div class="mixer-group-header">
+        <span class="mixer-label">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 12s1.5-2 4-2 4 2 4 2"/><path d="M9 15c.5.5 1.5 1 3 1s2.5-.5 3-1"/></svg>
+          <span>Ambience</span>
+        </span>
+        <button id="btn-ambience-dropdown" aria-controls="ambience-dropdown-menu" aria-expanded="false" class="ambience-dropdown-btn" type="button" title="Granular Ambience Controls (Traffic, Honking, Animals, Birds, Voices)">
+          <span>Layers</span>
+          <svg class="dropdown-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+      </div>
+      <input type="range" id="slider-ambience-vol" aria-label="Ambience volume" class="mixer-slider" min="0" max="1" step="0.01" value="0.70" title="Master Ambience Volume (scales all ambience layers)">
+
+      <!-- Granular Ambience Layers Dropdown Panel -->
+      <div id="ambience-dropdown-menu" class="ambience-dropdown-menu">
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-wind-vol">Wind</label>
+          <input type="range" id="slider-wind-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.40" title="Organic Wind & Breeze Volume">
+          <span class="submixer-val" id="val-wind-vol">40%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-habitat-vol">Habitat</label>
+          <input type="range" id="slider-habitat-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.50" title="Base Habitat Atmosphere (Urban/Forest/Ocean)">
+          <span class="submixer-val" id="val-habitat-vol">50%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-traffic-vol">Traffic</label>
+          <input type="range" id="slider-traffic-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.60" title="Vehicle Traffic Rumble Volume">
+          <span class="submixer-val" id="val-traffic-vol">60%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-horns-vol">Honking</label>
+          <input type="range" id="slider-horns-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.35" title="Horns & City Honking Volume">
+          <span class="submixer-val" id="val-horns-vol">35%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-animals-vol">Animals</label>
+          <input type="range" id="slider-animals-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.50" title="Insects & Woodland Wildlife Volume">
+          <span class="submixer-val" id="val-animals-vol">50%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-birds-vol">Birds</label>
+          <input type="range" id="slider-birds-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.50" title="Canopy Songbirds Chirping Volume">
+          <span class="submixer-val" id="val-birds-vol">50%</span>
+        </div>
+        <div class="submixer-row">
+          <label class="submixer-label" for="slider-voices-vol">Voices</label>
+          <input type="range" id="slider-voices-vol" class="submixer-slider" min="0" max="1" step="0.01" value="0.40" title="Human Voices & Crowd Chatter Volume">
+          <span class="submixer-val" id="val-voices-vol">40%</span>
+        </div>
+      </div>
     </div>
 
     <!-- Lo-Fi Volume -->
@@ -294,7 +242,7 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
         <span>Lo-Fi</span>
       </span>
-      <input type="range" id="slider-lofi-vol" class="mixer-slider" min="0" max="1" step="0.01" value="0" title="Lo-Fi Chillhop Volume">
+      <input type="range" id="slider-lofi-vol" aria-label="Lo-Fi volume" class="mixer-slider" min="0" max="1" step="0.01" value="0" title="Lo-Fi Chillhop Volume">
     </div>
 
     <!-- 3D Relief Elevation Toggle -->
@@ -311,24 +259,11 @@
 
     <div class="hud-sub-info">
       <span id="zoom-display">Zoom 2.1</span>
-      <span>AWS 3D DEM</span>
+      <span id="map-source">AWS 3D DEM</span>
     </div>
-  </div>
+  </section>
 
-  <!-- ==========================================
-       FLOATING MOUSE FOLLOWER
-       ========================================== -->
-  <div id="cursor-tracker">
-    <div class="tracker-top">
-      <span id="tracker-rate" class="tracker-rate">0.0 mm/h</span>
-      <span id="tracker-tag" class="tracker-tag">☀️ Clear</span>
-    </div>
-    <span id="tracker-coords" class="tracker-coords">0.0°N, 0.0°E</span>
-    <span id="tracker-hint" class="tracker-hint">Click anywhere to play live rain</span>
-  </div>
-
-  <!-- Zen Mode Toast Notice -->
-  <div id="zen-toast" class="zen-toast"></div>
+  <div id="cursor-tracker" class="rain-only" aria-hidden="true"></div>
 
   <!-- Zen Mode Floating Exit Button (Mobile & Desktop) -->
   <button id="btn-exit-zen" class="exit-zen-btn" title="Exit Zen Mode (Hotkey H or Tap)">
@@ -345,7 +280,7 @@
   <div id="sound-of-change-view" class="sound-of-change-view"></div>
 
   <!-- ==========================================
-       EARTH ARCADE: 8 ENVIRONMENTAL EXPLORATION GAMES
+       EARTH ARCADE: 6 ENVIRONMENTAL EXPLORATION GAMES
        ========================================== -->
   <div id="arcade-view" class="arcade-view"></div>
 
@@ -386,9 +321,7 @@
 
         <h3 style="font-size: 14px; margin-top: 14px; color: #34d399;">🏙️ Experience 2: The Sound of Change</h3>
         <p>
-          Explore urban acoustic pollution in New York City (Manhattan) using cinematic 1080p footage generated with <strong>Google Flow</strong>. 
-          Discover how 20 distinct interventions across four major categories can transform a chaotic, high-noise metropolis into a quiet, 
-          healthy urban sanctuary:
+          Listen to a Manhattan street, try 20 planning interventions, and compare the simulated noise index and live 64-band spectrum.
         </p>
         <ul style="padding-left: 20px; font-size: 12.5px; color: var(--text-sub); line-height: 1.6; margin-bottom: 10px;">
           <li><strong>Transportation & Traffic:</strong> Electric transit, low-noise asphalt, speed management, and anti-honking cameras.</li>
@@ -399,15 +332,13 @@
 
         <h3 style="font-size: 14px; margin-top: 14px; color: #f59e0b;">🎮 Experience 3: Earth Arcade</h3>
         <p>
-          Eight environmental exploration games where NASA and NOAA satellite data directly shape procedural worlds:
-          <strong>Rainway</strong> (endless procedural driving in NASA GPM rain with secret Cloud Glider flight), 
+          Six environmental exploration games where NASA and NOAA satellite data directly shape procedural worlds:
           <strong>Fireline</strong> (2.5D isometric forest exploration with NASA FIRMS active fire alerts), 
-          <strong>Heat Escape</strong> (NASA ECOSTRESS land surface temperature), 
-          <strong>Water Keeper</strong> (NASA SMAP soil moisture), 
+          <strong>Heat Escape</strong> (five-lane runner inspired by NASA ECOSTRESS surface temperatures),
           <strong>Cloud Courier</strong> (NASA OMI SO₂/NO₂), 
           <strong>Ozone Drift</strong> (NASA Ozone Watch), 
           <strong>Coral Current</strong> (NOAA Coral Reef Watch), and 
-          <strong>Last Forest</strong> (NASA/USGS Landsat). Earn Zen tokens to unlock custom vehicles and spirit glows!
+          <strong>Last Forest</strong> (NASA/USGS Landsat). Earn Zen tokens to unlock custom cosmetics and spirit glows!
         </p>
 
         <h3 style="font-size: 14px; margin-top: 14px; color: var(--text-main);">📐 Scientifically Responsible Modeling</h3>
@@ -422,13 +353,15 @@
         <p>
           • <code>/</code> Focus global searchbar<br>
           • <code>Space</code> Play / Pause audio soundscape<br>
-          • <code>A</code> Open Earth Arcade (8 NASA Environmental Games)<br>
+          • <code>A</code> Open Earth Arcade (6 environmental games)<br>
           • <code>C</code> Switch between Global Rain & Sound of Change<br>
           • <code>S</code> Find & Fly to Heaviest Rain Area on Earth<br>
           • <code>L</code> Toggle Lo-Fi chillhop mode<br>
           • <code>H</code> Toggle Zen View (hide/show all HUD capsules)<br>
           • <code>Right-Click + Drag</code> Tilt and rotate 3D bumpy globe
         </p>
+
+        <p id="atlas-credit" hidden>2D globe imagery: NASA Blue Marble Next Generation, distributed with Matplotlib Basemap. Live precipitation, when available, comes from NASA GPM IMERG.</p>
 
         <a href="https://svs.gsfc.nasa.gov/5650" target="_blank" rel="noopener noreferrer" class="modal-link-btn">
           Visit Official NASA SVS 5650 Entry

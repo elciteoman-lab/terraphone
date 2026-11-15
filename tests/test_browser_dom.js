@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 // Minimal browser environment simulation for full integration test
 class MockClassList {
   constructor() { this.classes = new Set(); }
@@ -22,6 +23,8 @@ class MockElement {
     this.classList = new MockClassList();
     this.attributes = {};
     this.style = {};
+    this.width = 512;
+    this.height = 80;
     this.children = [];
     this.listeners = {};
     this.innerHTML = '';
@@ -40,7 +43,9 @@ class MockElement {
   click() {
     this.dispatchEvent({ type: 'click', target: this, stopPropagation: () => {} });
   }
-  querySelector(sel) { return null; }
+  querySelector(sel) { return getOrCreate(sel); }
+  focus() {}
+  getContext() { return { clearRect() {}, fillRect() {} }; }
   querySelectorAll(sel) { return []; }
   appendChild(child) { this.children.push(child); return child; }
   getBoundingClientRect() { return { left: 0, top: 0, width: 1000, height: 600 }; }
@@ -60,6 +65,8 @@ global.document = {
   getElementById: (id) => getOrCreate(id),
   createElement: (tag) => new MockElement(tag),
   addEventListener: () => {},
+  removeEventListener: () => {},
+  hidden: false,
   querySelectorAll: () => [],
   activeElement: { tagName: 'BODY' }
 };
@@ -117,6 +124,7 @@ global.AudioContext = class MockAudioContext {
     this.state = 'running';
   }
   createGain() { return new MockGainNode(); }
+  createAnalyser() { return { frequencyBinCount: 256, getByteFrequencyData(data) { data.fill(36); } }; }
   createBiquadFilter() { return new MockBiquadFilterNode(); }
   createOscillator() { return new MockOscillatorNode(); }
   createBuffer(channels, length, rate) {
@@ -129,6 +137,10 @@ global.AudioContext = class MockAudioContext {
   resume() { return Promise.resolve(); }
 };
 
+const frames = new Map();
+let frameId = 0;
+global.requestAnimationFrame = fn => { frames.set(++frameId, fn); return frameId; };
+global.cancelAnimationFrame = id => frames.delete(id);
 global.Audio = class MockAudio {
   constructor() {
     this.src = '';
@@ -141,31 +153,46 @@ global.Audio = class MockAudio {
 console.log('Testing App import and initialization in simulated DOM...');
 import('../js/interventions-data.js').then(({ INTERVENTIONS, INTERVENTION_CATEGORIES }) => {
   console.log('Interventions data loaded:', INTERVENTIONS.length, 'items');
-  import('../js/sound-of-change.js').then(({ SoundOfChangeEngine }) => {
+  return import('../js/sound-of-change.js').then(({ SoundOfChangeEngine }) => {
     const container = new MockElement('div', 'sound-of-change-view');
     const engine = new SoundOfChangeEngine(new global.AudioContext());
     engine.mount(container);
-    console.log('SoundOfChangeEngine mounted cleanly!');
+    assert.equal(frames.size, 0, 'Mounting a silent scene must not start an animation loop');
     
     // Test toggles
     console.log('Toggling electric_public_transport...');
     engine.toggleIntervention('electric_public_transport');
-    console.assert(engine.activeInterventions.has('electric_public_transport'), 'Must be active');
+    assert.ok(engine.activeInterventions.has('electric_public_transport'), 'Must be active');
     
     console.log('Testing audio start...');
     engine.startAudio();
-    console.assert(engine.isPlaying === true, 'Audio must be playing');
+    assert.ok(engine.isPlaying === true, 'Audio must be playing');
 
+    assert.equal(frames.size, 1);
+    engine.enter();
+    assert.equal(frames.size, 1, 'Re-entering must not duplicate a loop');
+    engine.renderCavaFrame(1 / 60);
+    assert.ok(engine.cavaBarValues.some(value => value > 0), 'FFT data must feed the displayed bars');
+    document.hidden = true;
+    engine.onVisibility();
+    assert.equal(frames.size, 0);
+    document.hidden = false;
+    engine.onVisibility();
+    assert.equal(frames.size, 1);
     console.log('Testing perspective switch...');
     engine.perspective = 'indoor';
     engine.updateSimulation();
     const indState = engine.calculateAcousticState();
     console.log('Indoor State with Electric Transport:', indState.index);
-    console.assert(indState.index <= 72, 'Indoor state should be lower than baseline');
+    assert.ok(indState.index <= 72, 'Indoor state should be lower than baseline');
 
     console.log('Testing audio stop...');
+    engine.leave();
+    assert.equal(frames.size, 0);
+    engine.enter();
+    assert.equal(frames.size, 0, 'Returning should stay silent until requested');
     engine.stop();
-    console.assert(engine.isPlaying === false, 'Audio must be stopped');
+    assert.ok(engine.isPlaying === false, 'Audio must be stopped');
 
     console.log('✅ Mock DOM Integration Test Passed 100%!');
   });

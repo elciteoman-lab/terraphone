@@ -14,7 +14,15 @@
 
 import { arcadeTokens } from './arcade-tokens.js';
 
+import { prepareGameArt, renderGame } from './art/frame.js';
+import { paintWoodland, prepareWoodland } from './art/woodland.js';
+import { woodlandReadout } from './game-readout.js';
+
 export class FirelineGame {
+  static prepareArtwork(width, height) {
+    return prepareGameArt(width, height, prepareWoodland);
+  }
+
   constructor(canvas, audioCtx, onExit) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -76,8 +84,9 @@ export class FirelineGame {
     this.springs = [];
     this.firmsAnomalies = [];
 
-    for (let x = -30; x <= 30; x++) {
-      for (let y = -30; y <= 30; y++) {
+    // Compact procedural grid for instant lag-free startup
+    for (let x = -22; x <= 22; x++) {
+      for (let y = -22; y <= 22; y++) {
         const dist = Math.hypot(x, y);
         if (dist < 3) continue; // Clear clearing at spawn
 
@@ -95,7 +104,7 @@ export class FirelineGame {
         }
 
         // NASA FIRMS Thermal Anomaly Zones (warm satellite thermal hotspots)
-        if (fract > 0.94 && dist > 8) {
+        if (fract > 0.94 && dist > 7) {
           this.firmsAnomalies.push({
             x: x * this.tileSize,
             y: y * this.tileSize,
@@ -116,8 +125,8 @@ export class FirelineGame {
           });
         }
 
-        // Sacred River Spring at intervals (3 ancient springs to restore)
-        if ((x === 0 && y === 12) || (x === 18 && y === -15) || (x === -20 && y === 20)) {
+        // Sacred River Spring / Wells at designated intervals (3 ancient springs to restore)
+        if ((x === 0 && y === 10) || (x === 14 && y === -12) || (x === -15 && y === 14)) {
           this.springs.push({
             x: x * this.tileSize,
             y: y * this.tileSize,
@@ -129,6 +138,9 @@ export class FirelineGame {
         }
       }
     }
+
+    // Pre-sort trees once during generation to eliminate per-frame sorting overhead
+    this.trees.sort((a, b) => a.y - b.y);
     this.isVictory = false;
   }
 
@@ -159,7 +171,7 @@ export class FirelineGame {
   triggerFireflyMode(duration = 10) {
     this.player.isFirefly = true;
     this.player.fireflyTimer = duration;
-    arcadeTokens.unlockEasterEgg('Golden Firefly Flight', 10);
+    arcadeTokens.unlockEasterEgg('Golden Firefly Flight', 5);
     this.playChime(880);
   }
 
@@ -297,11 +309,10 @@ export class FirelineGame {
         sp.seedsDeposited += deposit;
         this.player.seedsCarried -= deposit;
         this.seedsSaved += deposit;
-        arcadeTokens.addTokens(deposit * 2, 'Restored Forest Spring');
-
         if (sp.seedsDeposited >= sp.seedsNeeded) {
           sp.restored = true;
           this.forestsRestored += 1;
+          arcadeTokens.addTokens(1, 'Restored Forest Spring');
           this.playChime(1040);
         } else {
           this.playChime(780);
@@ -310,7 +321,7 @@ export class FirelineGame {
         // Check overall victory condition (all 3 springs restored)
         if (this.springs.every(s => s.restored) && !this.isVictory) {
           this.isVictory = true;
-          arcadeTokens.addTokens(25, 'Forest Watershed Fully Restored');
+          arcadeTokens.addTokens(5, 'Forest Watershed Fully Restored');
           this.playChime(1200);
         }
       }
@@ -330,208 +341,7 @@ export class FirelineGame {
   }
 
   render() {
-    const width = this.canvas.width;
-    const height = this.canvas.height;
-    const ctx = this.ctx;
-
-    // Forest floor background
-    ctx.fillStyle = '#0a120c';
-    ctx.fillRect(0, 0, width, height);
-
-    // Subtle isometric ground grid lines
-    ctx.strokeStyle = 'rgba(16, 185, 129, 0.04)';
-    ctx.lineWidth = 1;
-    const step = 64;
-    for (let x = -width; x < width * 2; x += step) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x + height * 1.5, height);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x - height * 1.5, height);
-      ctx.stroke();
-    }
-
-    // 1. Render NASA FIRMS Anomaly Zones (warm ground halos)
-    this.firmsAnomalies.forEach(fa => {
-      const p = this.worldToIso(fa.x, fa.y);
-      const rad = fa.radius * 0.8;
-      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad);
-      grad.addColorStop(0, 'rgba(245, 158, 11, 0.28)');
-      grad.addColorStop(0.6, 'rgba(239, 68, 68, 0.12)');
-      grad.addColorStop(1, 'transparent');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, rad * 1.4, rad * 0.7, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // 2. Render Springs
-    this.springs.forEach(sp => {
-      const p = this.worldToIso(sp.x, sp.y);
-      ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, 36, 18, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    });
-
-    // 3. Render Seeds
-    this.seeds.forEach(s => {
-      if (s.collected) return;
-      const p = this.worldToIso(s.x, s.y);
-      ctx.fillStyle = s.isGolden ? '#facc15' : '#34d399';
-      ctx.shadowColor = s.isGolden ? '#facc15' : '#34d399';
-      ctx.shadowBlur = s.isGolden ? 16 : 8;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y - 6, s.isGolden ? 7 : 4.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-    });
-
-    // 4. Render Trees (Sorted by Y for depth)
-    const visibleTrees = this.trees.slice().sort((a, b) => a.y - b.y);
-    visibleTrees.forEach(t => {
-      const p = this.worldToIso(t.x, t.y);
-      if (p.x < -60 || p.x > width + 60 || p.y < -60 || p.y > height + 60) return;
-
-      // Tree trunk
-      ctx.fillStyle = '#1c1917';
-      ctx.fillRect(p.x - 3, p.y - 12, 6, 12);
-
-      // Layered canopy
-      ctx.fillStyle = t.type === 'pine' ? '#064e3b' : '#047857';
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y - t.size - 10);
-      ctx.lineTo(p.x - t.size * 0.5, p.y - 10);
-      ctx.lineTo(p.x + t.size * 0.5, p.y - 10);
-      ctx.closePath();
-      ctx.fill();
-    });
-
-    // 5. Render Player Spirit & Light Trail
-    const spiritColor = arcadeTokens.getEquippedHex('spiritGlow');
-    this.player.trail.forEach(t => {
-      if (t.alpha <= 0) return;
-      const tp = this.worldToIso(t.x, t.y);
-      ctx.fillStyle = spiritColor;
-      ctx.globalAlpha = t.alpha * 0.45;
-      ctx.beginPath();
-      ctx.arc(tp.x, tp.y - 8, this.player.size * 0.6, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.globalAlpha = 1.0;
-
-    const pp = this.worldToIso(this.player.x, this.player.y);
-    ctx.save();
-    ctx.shadowColor = spiritColor;
-    ctx.shadowBlur = 20;
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(pp.x, pp.y - 10, this.player.size * 0.8, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Firefly wings if transformed
-    if (this.player.isFirefly) {
-      ctx.fillStyle = 'rgba(250, 204, 21, 0.7)';
-      ctx.beginPath();
-      ctx.ellipse(pp.x - 12, pp.y - 16, 10, 4, -0.4, 0, Math.PI * 2);
-      ctx.ellipse(pp.x + 12, pp.y - 16, 10, 4, 0.4, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-
-    // 5. Nearest Sacred Spring Compass Indicator
-    const unrestored = this.springs.filter(s => !s.restored);
-    if (unrestored.length > 0) {
-      unrestored.sort((a, b) => Math.hypot(this.player.x - a.x, this.player.y - a.y) - Math.hypot(this.player.x - b.x, this.player.y - b.y));
-      const target = unrestored[0];
-      const targetIso = this.worldToIso(target.x, target.y);
-      const angle = Math.atan2(targetIso.y - pp.y, targetIso.x - pp.x);
-
-      ctx.save();
-      ctx.translate(pp.x, pp.y);
-      ctx.rotate(angle);
-      ctx.fillStyle = '#38bdf8';
-      ctx.beginPath();
-      ctx.moveTo(34, 0);
-      ctx.lineTo(24, -6);
-      ctx.lineTo(26, 0);
-      ctx.lineTo(24, 6);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // 6. On-screen NASA FIRMS HUD (Bottom-anchored to never collide with top buttons)
-    this.renderHud(ctx, width, height);
-
-    // 7. Victory Screen
-    if (this.isVictory) {
-      ctx.fillStyle = 'rgba(3, 7, 18, 0.88)';
-      ctx.fillRect(0, 0, width, height);
-
-      ctx.fillStyle = '#10b981';
-      ctx.font = '800 28px system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('✨ ANCIENT WATERSHED RESTORED! ✨', width / 2, height / 2 - 40);
-
-      ctx.fillStyle = '#f8fafc';
-      ctx.font = '500 14px system-ui, sans-serif';
-      ctx.fillText('All 3 Sacred River Springs are flowing again with clean alpine runoff.', width / 2, height / 2 - 6);
-
-      ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 16px system-ui, sans-serif';
-      ctx.fillText('🪙 +25 Zen Tokens Awarded', width / 2, height / 2 + 30);
-
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '12px system-ui, sans-serif';
-      ctx.fillText('Press Esc or Exit Game to claim rewards and explore other games', width / 2, height / 2 + 65);
-    }
-  }
-
-  renderHud(ctx, width, height) {
-    const hudY = height - 96;
-
-    // NASA FIRMS Badge (Bottom Left)
-    ctx.fillStyle = 'rgba(10, 15, 26, 0.88)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(24, hudY, 320, 72, 14);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#f59e0b';
-    ctx.font = 'bold 11px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText('🛰️ NASA FIRMS THERMAL SATELLITE DATA', 38, hudY + 22);
-
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = 'bold 13.5px system-ui, sans-serif';
-    ctx.fillText(`MODIS / VIIRS Active Fire Alerts`, 38, hudY + 43);
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '10.5px system-ui, sans-serif';
-    ctx.fillText('Follow blue compass arrow to restore River Springs', 38, hudY + 60);
-
-    // Objective & Seeds (Bottom Right)
-    ctx.beginPath();
-    ctx.roundRect(width - 240, hudY, 216, 72, 14);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#34d399';
-    ctx.font = 'bold 13.5px system-ui, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(`🌱 Seeds Carried: ${this.player.seedsCarried}`, width - 42, hudY + 30);
-
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = '700 12px system-ui, sans-serif';
-    ctx.fillText(`💧 Springs Restored: ${this.forestsRestored} / 3`, width - 42, hudY + 54);
+    renderGame(this, paintWoodland, woodlandReadout);
   }
 
   start() {
