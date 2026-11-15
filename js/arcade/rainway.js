@@ -77,6 +77,7 @@ export class RainwayGame {
 
     // Milestone tracking
     this.distanceTraveled = 0;
+    this.completedLaps = 0;
     this.motesCollected = 0;
     this.vyltSignFound = false;
 
@@ -138,13 +139,13 @@ export class RainwayGame {
         p2: { world: { y: y2, z: (i + 1) * this.segmentLength }, screen: {} },
         curve: curCurve,
         color: Math.floor(i / 3) % 2 ? {
-          road: '#1a1f2e',
-          grass: '#0f172a',
+          road: '#1c2438',
+          grass: '#0f4435',
           rumble: '#38bdf8',
           lane: '#f8fafc'
         } : {
-          road: '#151926',
-          grass: '#0a0f1d',
+          road: '#161c2c',
+          grass: '#0a3528',
           rumble: '#1e293b',
           lane: 'transparent'
         },
@@ -409,29 +410,32 @@ export class RainwayGame {
       this.speed = Math.max(0, this.speed - this.braking * 1.8 * dt);
     }
 
-    // Steering: responsive at low and high speeds
-    const speedFactor = Math.abs(this.speed) / this.maxSpeed;
-    const steerRate = (this.speed === 0 ? 0 : Math.max(0.65, speedFactor)) * 2.5;
+    // Steering: responsive at low and high speeds, including standstill
+    const speedRatio = Math.min(1.0, Math.abs(this.speed) / this.maxSpeed);
+    const steerRate = Math.max(1.8, 1.8 + speedRatio * 2.4);
 
     if (this.keys.left) {
       this.playerX -= steerRate * dt;
-      this.steerAngle = Math.max(-0.28, this.steerAngle - 1.2 * dt);
+      this.steerAngle = Math.max(-0.42, this.steerAngle - 2.8 * dt);
     } else if (this.keys.right) {
       this.playerX += steerRate * dt;
-      this.steerAngle = Math.min(0.28, this.steerAngle + 1.2 * dt);
+      this.steerAngle = Math.min(0.42, this.steerAngle + 2.8 * dt);
     } else {
-      this.steerAngle *= 0.82;
+      this.steerAngle *= 0.78;
     }
 
     // Centrifugal curve push (balanced so turning easily overcomes it)
     const currentSegment = this.findSegment(this.position);
-    this.playerX -= (currentSegment.curve * speedFactor * 0.14) * dt;
+    this.playerX -= (currentSegment.curve * speedRatio * 0.08) * dt;
 
-    // Road friction boundary
+    // Road friction boundary & grass handling
     if (Math.abs(this.playerX) > 1.0) {
-      // Offroad grass deceleration
-      this.speed = Math.max(0, this.speed - 30 * dt);
-      this.playerX = Math.max(-1.85, Math.min(1.85, this.playerX));
+      // Offroad grass dampens speed to 16 m/s (~58 km/h) instead of freezing to zero
+      const grassMax = 16;
+      if (this.speed > grassMax) {
+        this.speed = Math.max(grassMax, this.speed - 20 * dt);
+      }
+      this.playerX = Math.max(-2.2, Math.min(2.2, this.playerX));
     }
 
     // Advance position
@@ -457,13 +461,27 @@ export class RainwayGame {
     if (currentSegment.hasSign && !this.vyltSignFound) {
       if (this.playerX >= 1.15 && this.playerX <= 1.85) {
         this.vyltSignFound = true;
-        arcadeTokens.unlockEasterEgg('VYLT × TERRAPHONE Landmark', 10);
+        arcadeTokens.unlockEasterEgg('VYLT × TERRAPHONE Landmark', 5);
         this.playChimeSound(880, 0.5);
         const signToast = document.getElementById('rainway-sign-toast');
         if (signToast) {
           signToast.classList.add('visible');
           setTimeout(() => signToast.classList.remove('visible'), 4500);
         }
+      }
+    }
+
+    // Check Valley Research Station milestone (every 2,400 meters)
+    const curLap = Math.floor(this.distanceTraveled / 2400);
+    if (curLap > this.completedLaps) {
+      this.completedLaps = curLap;
+      arcadeTokens.addTokens(2, 'Reached Weather Research Outpost');
+      this.playChimeSound(1040, 0.6);
+      const signToast = document.getElementById('rainway-sign-toast');
+      if (signToast) {
+        signToast.textContent = `🎉 Weather Research Outpost Reached! Lap ${curLap} Complete (+2 Tokens)`;
+        signToast.classList.add('visible');
+        setTimeout(() => signToast.classList.remove('visible'), 4000);
       }
     }
 
@@ -481,15 +499,15 @@ export class RainwayGame {
   // 3D PSEUDO-PROJECTION & RENDERING
   // ==========================================
 
-  project(p, cameraX, cameraY, cameraZ, cameraDepth, width, height, roadWidth) {
+  project(p, cameraX, cameraY, cameraZ, cameraDepth, width, height, roadWidth, horizonY) {
     p.camera = {
       x: (p.world.x || 0) - cameraX,
       y: (p.world.y || 0) - cameraY,
       z: (p.world.z || 0) - cameraZ
     };
-    p.screen.scale = cameraDepth / p.camera.z;
+    p.screen.scale = cameraDepth / Math.max(0.1, p.camera.z);
     p.screen.x = Math.round((width / 2) + (p.screen.scale * p.camera.x * width / 2));
-    p.screen.y = Math.round((height / 2) - (p.screen.scale * p.camera.y * height / 2));
+    p.screen.y = Math.round(horizonY - (p.screen.scale * p.camera.y * height / 2));
     p.screen.w = Math.round((p.screen.scale * roadWidth * width / 2));
   }
 
@@ -502,17 +520,23 @@ export class RainwayGame {
 
     const sector = this.weatherSectors[this.currentSectorIdx];
 
-    // 1. Sky & Atmospheric Mountains
-    this.renderSkyAndMountains(ctx, width, height, sector);
-
-    // 2. Road Projection
+    // Calculate dynamic pitch based on downhill / uphill road slope ahead
     const baseSegment = this.findSegment(this.position);
     const baseIndex = baseSegment.index;
+    const lookAhead = 16;
+    const lookSegment = this.segments[(baseIndex + lookAhead) % this.totalSegments];
+    const roadSlope = (lookSegment.p1.world.y - baseSegment.p1.world.y) / (lookAhead * this.segmentLength);
+    const pitchOffset = Math.max(-height * 0.25, Math.min(height * 0.25, roadSlope * height * 0.35));
+    const horizonY = height * 0.50 - pitchOffset;
+
+    // 1. Sky & Atmospheric Mountains with solid terrain base
+    this.renderSkyAndMountains(ctx, width, height, sector, horizonY);
+
+    // 2. Road Projection Pass
     const cameraX = this.playerX * this.roadWidth;
     const cameraY = this.cameraHeight + baseSegment.p1.world.y + (this.isGliderMode ? this.gliderAltitude * 22 : 0);
     const cameraZ = this.position;
 
-    let maxy = height;
     let x = 0;
     let dx = -(baseSegment.curve * (this.position % this.segmentLength) / this.segmentLength);
 
@@ -526,21 +550,22 @@ export class RainwayGame {
       segment.p1.world.x = x;
       segment.p2.world.x = x + dx;
 
-      this.project(segment.p1, cameraX, cameraY, cameraZ, this.cameraDepth, width, height, this.roadWidth);
-      this.project(segment.p2, cameraX, cameraY, cameraZ, this.cameraDepth, width, height, this.roadWidth);
+      this.project(segment.p1, cameraX, cameraY, cameraZ, this.cameraDepth, width, height, this.roadWidth, horizonY);
+      this.project(segment.p2, cameraX, cameraY, cameraZ, this.cameraDepth, width, height, this.roadWidth, horizonY);
 
       x += dx;
       dx += segment.curve;
-
-      if (segment.p1.camera.z <= this.cameraDepth || segment.p2.screen.y >= maxy) continue;
-
-      this.renderSegment(ctx, width, segment.p1.screen, segment.p2.screen, segment.color, sector.rainRate);
-      maxy = segment.p2.screen.y;
     }
 
-    // 3. Render Roadside Scenery (Trees, Signs, Cloud Rings)
-    for (let n = this.drawDistance - 1; n > 0; n--) {
+    // 3. Back-to-Front Painter's Algorithm Rendering
+    // Guarantees downhill segments, mountain dips, and curves are never culled or left as black voids
+    for (let n = this.drawDistance - 1; n >= 0; n--) {
       const segment = this.segments[(baseIndex + n) % this.totalSegments];
+      if (segment.p1.camera.z <= this.cameraDepth) continue;
+
+      this.renderSegment(ctx, width, segment.p1.screen, segment.p2.screen, segment.color, sector.rainRate);
+
+      // Render scenery elements in strict back-to-front depth order
       if (segment.hasSign) {
         this.renderSign(ctx, segment.p1.screen);
       }
@@ -558,19 +583,27 @@ export class RainwayGame {
     // 5. Weather Particles (Rain streaks, splashes, windshield mist)
     this.renderRainWeather(ctx, width, height, sector.rainRate);
 
-    // 6. On-Screen HUD Overlay
+    // 6. On-Screen HUD Overlay (Objective, Speed, Milestones)
     this.renderGameHud(ctx, width, height, sector);
   }
 
-  renderSkyAndMountains(ctx, width, height, sector) {
-    const horizon = height * 0.48;
+  renderSkyAndMountains(ctx, width, height, sector, horizonY) {
+    const horizon = horizonY || (height * 0.48);
 
     // Atmospheric sky gradient
     const skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
     skyGrad.addColorStop(0, sector.skyColor);
     skyGrad.addColorStop(1, '#1e293b');
     ctx.fillStyle = skyGrad;
-    ctx.fillRect(0, 0, width, horizon);
+    ctx.fillRect(0, 0, width, Math.max(0, horizon));
+
+    // Solid lush earth/forest terrain base beneath horizon (eliminates any black canvas gaps)
+    const groundGrad = ctx.createLinearGradient(0, horizon, 0, height);
+    groundGrad.addColorStop(0, '#0d3829');
+    groundGrad.addColorStop(0.3, '#092b1f');
+    groundGrad.addColorStop(1, '#051b13');
+    ctx.fillStyle = groundGrad;
+    ctx.fillRect(0, horizon, width, height - horizon);
 
     // Distant mountain ranges (parallax with steering/curve)
     ctx.fillStyle = '#0f172a';
@@ -601,24 +634,24 @@ export class RainwayGame {
     const r1 = p1.w / 6;
     const r2 = p2.w / 6;
 
-    // Grass: continuous polygon slopes on left and right sides
+    // Grass: continuous polygon slopes on left and right sides (slight 1px overlap prevents subpixel seams)
     ctx.fillStyle = color.grass;
-    this.drawPolygon(ctx, 0, p1.y, p1.x - p1.w - r1, p1.y, p2.x - p2.w - r2, p2.y, 0, p2.y);
-    this.drawPolygon(ctx, p1.x + p1.w + r1, p1.y, width, p1.y, width, p2.y, p2.x + p2.w + r2, p2.y);
+    this.drawPolygon(ctx, 0, p1.y, p1.x - p1.w - r1, p1.y, p2.x - p2.w - r2, p2.y + 1, 0, p2.y + 1);
+    this.drawPolygon(ctx, p1.x + p1.w + r1, p1.y, width, p1.y, width, p2.y + 1, p2.x + p2.w + r2, p2.y + 1);
 
     // Rumble strips (curbs)
     ctx.fillStyle = color.rumble;
-    this.drawPolygon(ctx, p1.x - p1.w - r1, p1.y, p1.x - p1.w, p1.y, p2.x - p2.w, p2.y, p2.x - p2.w - r2, p2.y);
-    this.drawPolygon(ctx, p1.x + p1.w, p1.y, p1.x + p1.w + r1, p1.y, p2.x + p2.w + r2, p2.y, p2.x + p2.w, p2.y);
+    this.drawPolygon(ctx, p1.x - p1.w - r1, p1.y, p1.x - p1.w, p1.y, p2.x - p2.w, p2.y + 1, p2.x - p2.w - r2, p2.y + 1);
+    this.drawPolygon(ctx, p1.x + p1.w, p1.y, p1.x + p1.w + r1, p1.y, p2.x + p2.w + r2, p2.y + 1, p2.x + p2.w, p2.y + 1);
 
     // Road asphalt
     ctx.fillStyle = color.road;
-    this.drawPolygon(ctx, p1.x - p1.w, p1.y, p1.x + p1.w, p1.y, p2.x + p2.w, p2.y, p2.x - p2.w, p2.y);
+    this.drawPolygon(ctx, p1.x - p1.w, p1.y, p1.x + p1.w, p1.y, p2.x + p2.w, p2.y + 1, p2.x - p2.w, p2.y + 1);
 
     // Wet road specular reflection (brighter when rainRate > 0)
     if (rainRate > 0.5) {
       ctx.fillStyle = `rgba(56, 189, 248, ${Math.min(0.22, rainRate * 0.01)})`;
-      this.drawPolygon(ctx, p1.x - p1.w, p1.y, p1.x + p1.w, p1.y, p2.x + p2.w, p2.y, p2.x - p2.w, p2.y);
+      this.drawPolygon(ctx, p1.x - p1.w, p1.y, p1.x + p1.w, p1.y, p2.x + p2.w, p2.y + 1, p2.x - p2.w, p2.y + 1);
     }
 
     // Center dashed white lines
@@ -626,7 +659,7 @@ export class RainwayGame {
       const lw1 = p1.w / 32;
       const lw2 = p2.w / 32;
       ctx.fillStyle = color.lane;
-      this.drawPolygon(ctx, p1.x - lw1, p1.y, p1.x + lw1, p1.y, p2.x + lw2, p2.y, p2.x - lw2, p2.y);
+      this.drawPolygon(ctx, p1.x - lw1, p1.y, p1.x + lw1, p1.y, p2.x + lw2, p2.y + 1, p2.x - lw2, p2.y + 1);
     }
   }
 
@@ -716,14 +749,15 @@ export class RainwayGame {
     if (this.cameraMode === 'hood') return; // First-person view hides exterior
 
     const carColor = arcadeTokens.getEquippedHex('carPaint');
-    const carX = width / 2;
+    // Dynamic vehicle turn translation and crisp steering rotation
+    const carX = width / 2 + (this.playerX * 110);
     const carY = height * 0.82 - (this.isGliderMode ? 60 : 0);
     const carW = 120;
     const carH = 50;
 
     ctx.save();
     ctx.translate(carX, carY);
-    ctx.rotate(this.steerAngle * 0.6);
+    ctx.rotate(this.steerAngle * 1.15);
 
     if (this.isGliderMode) {
       // ----------------------------------------
@@ -844,7 +878,51 @@ export class RainwayGame {
   }
 
   renderGameHud(ctx, width, height, sector) {
-    // Bottom-left Sector & NASA GPM IMERG Info Card
+    // 1. Top-Center Primary Mission Objective HUD Bar
+    const targetDistance = 2400; // 2.4km research outpost loop
+    const progressPct = Math.min(1.0, (this.distanceTraveled % targetDistance) / targetDistance);
+    const laps = Math.floor(this.distanceTraveled / targetDistance);
+    const distRemaining = targetDistance - (this.distanceTraveled % targetDistance);
+
+    const objBoxW = Math.min(480, width - 40);
+    const objBoxH = 58;
+    const objBoxX = (width - objBoxW) / 2;
+    const objBoxY = 18;
+
+    ctx.fillStyle = 'rgba(10, 15, 26, 0.90)';
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(objBoxX, objBoxY, objBoxW, objBoxH, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('🎯 OBJECTIVE: REACH VALLEY RESEARCH STATION', objBoxX + 16, objBoxY + 20);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '600 12px system-ui, sans-serif';
+    ctx.fillText(`Sector: ${sector.name} · ${distRemaining}m to Outpost ${laps > 0 ? `(Lap ${laps + 1})` : ''}`, objBoxX + 16, objBoxY + 38);
+
+    // Objective Progress Bar
+    const barX = objBoxX + 16;
+    const barY = objBoxY + 45;
+    const barW = objBoxW - 32;
+    const barH = 5;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 2.5);
+    ctx.fill();
+
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW * progressPct, barH, 2.5);
+    ctx.fill();
+
+    // 2. Bottom-left Sector & NASA GPM IMERG Info Card
     ctx.fillStyle = 'rgba(10, 15, 26, 0.88)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 1;

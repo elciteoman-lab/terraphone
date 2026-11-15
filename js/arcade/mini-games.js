@@ -29,17 +29,17 @@ export class HeatEscapeGame {
     this.rafId = null;
     this.lastTime = 0;
 
-    // Player Scooter
+    // Player Scooter (Tuned for brisk responsiveness & electric dash)
     this.player = {
       x: canvas.width / 2,
       y: canvas.height * 0.75,
-      speed: 260,
+      speed: 420, // Crisp nimble scooter handling
       hydration: 100, // 0 - 100%
       distance: 0,
       targetDistance: 1000 // Reach Central Park at 1,000m
     };
 
-    this.keys = { left: false, right: false, up: false, down: false };
+    this.keys = { left: false, right: false, up: false, down: false, boost: false };
     this.cityAvenues = [];
     this.coolingOases = [];
     this.particles = [];
@@ -80,7 +80,7 @@ export class HeatEscapeGame {
         this.coolingOases.push({
           x: block.x + block.w / 2,
           y: block.y + block.h / 2,
-          radius: 36,
+          radius: 48,
           collected: false
         });
       }
@@ -93,6 +93,7 @@ export class HeatEscapeGame {
       if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') this.keys.right = true;
       if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') this.keys.up = true;
       if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') this.keys.down = true;
+      if (e.key === ' ' || e.key === 'Shift') this.keys.boost = true;
       if (e.key === 'r' || e.key === 'R') {
         if (this.isGameOver || this.isVictory) this.restart();
       }
@@ -103,6 +104,7 @@ export class HeatEscapeGame {
       if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') this.keys.right = false;
       if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') this.keys.up = false;
       if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') this.keys.down = false;
+      if (e.key === ' ' || e.key === 'Shift') this.keys.boost = false;
     };
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -127,16 +129,17 @@ export class HeatEscapeGame {
     if (this.keys.up) dy -= 1;
     if (this.keys.down) dy += 1;
 
-    // Scooter movement
-    this.player.x += dx * this.player.speed * dt;
-    this.player.y += dy * (this.player.speed * 0.7) * dt;
+    // Scooter movement with electric turbo boost
+    const curSpeed = this.player.speed * (this.keys.boost ? 1.38 : 1.0);
+    this.player.x += dx * curSpeed * dt;
+    this.player.y += dy * (curSpeed * 0.8) * dt;
 
     // Boundaries
     this.player.x = Math.max(30, Math.min(this.canvas.width - 30, this.player.x));
     this.player.y = Math.max(this.canvas.height * 0.3, Math.min(this.canvas.height - 40, this.player.y));
 
-    // Continuous forward progress
-    const forwardSpeed = this.keys.up ? 65 : 42;
+    // Continuous forward progress (balanced pacing)
+    const forwardSpeed = (this.keys.up ? 75 : 50) * (this.keys.boost ? 1.35 : 1.0);
     this.player.distance += dt * forwardSpeed;
 
     // Scroll city avenues downward relative to progress
@@ -155,13 +158,13 @@ export class HeatEscapeGame {
       }
     });
 
-    // Hydration physics
+    // Hydration physics (forgiving heat drain & generous canopy replenishment)
     if (inCoolZone) {
-      this.player.hydration = Math.min(100, this.player.hydration + 24 * dt);
+      this.player.hydration = Math.min(100, this.player.hydration + 35 * dt);
     } else {
-      // Hot asphalt heat island drains hydration
-      const heatIntensity = Math.max(0.6, (currentTemp - 32) / 16);
-      this.player.hydration = Math.max(0, this.player.hydration - 14 * heatIntensity * dt);
+      // Hot asphalt heat island drains hydration gently
+      const heatIntensity = Math.max(0.5, (currentTemp - 32) / 18);
+      this.player.hydration = Math.max(0, this.player.hydration - 7.5 * heatIntensity * dt);
     }
 
     // Check Game Over condition
@@ -173,7 +176,7 @@ export class HeatEscapeGame {
     // Check Victory condition (reached 1,000m Central Park Botanical Oasis)
     if (this.player.distance >= this.player.targetDistance) {
       this.isVictory = true;
-      arcadeTokens.addTokens(20, 'Escaped Urban Heat Island');
+      arcadeTokens.addTokens(5, 'Escaped Urban Heat Island');
       arcadeTokens.recordHighScore('heat_escape', Math.floor(this.player.distance), 'meters');
     }
 
@@ -450,7 +453,7 @@ export class WaterKeeperGame {
         arcadeTokens.addTokens(1, 'Moisture Restored to Arid Soil');
         if (this.patchesRestored >= this.targetPatches && !this.isVictory) {
           this.isVictory = true;
-          arcadeTokens.addTokens(20, 'Watershed Soil Restored');
+          arcadeTokens.addTokens(5, 'Watershed Soil Restored');
         }
       }
     } else {
@@ -724,7 +727,7 @@ export class CloudCourierGame {
 
         if (this.cloud.gatesCleared >= this.cloud.targetGates && !this.isVictory) {
           this.isVictory = true;
-          arcadeTokens.addTokens(20, 'Delivered Pure Rain to Valley');
+          arcadeTokens.addTokens(5, 'Delivered Pure Rain to Valley');
         }
       }
 
@@ -1008,7 +1011,7 @@ export class OzoneDriftGame {
 
         if (this.canistersCollected >= this.targetCanisters && !this.isVictory) {
           this.isVictory = true;
-          arcadeTokens.addTokens(25, 'NASA Aura Research Mission Complete');
+          arcadeTokens.addTokens(5, 'NASA Aura Research Mission Complete');
         }
       }
     });
@@ -1270,7 +1273,7 @@ export class CoralCurrentGame {
     // Check Victory
     if (this.distance >= this.targetDistance && !this.isVictory) {
       this.isVictory = true;
-      arcadeTokens.addTokens(20, 'Reached Coral Atoll Marine Sanctuary');
+      arcadeTokens.addTokens(5, 'Reached Coral Atoll Marine Sanctuary');
     }
 
     arcadeTokens.recordHighScore('coral_current', Math.floor(this.distance), 'meters');
@@ -1622,7 +1625,7 @@ export class LastForestGame {
           arcadeTokens.addTokens(2, 'Dispersed Forest Sycamore Seed');
           if (this.seed.seedsPlanted >= this.seed.targetSeeds && !this.isVictory) {
             this.isVictory = true;
-            arcadeTokens.addTokens(25, 'Ancient Forest Reforested');
+            arcadeTokens.addTokens(5, 'Ancient Forest Reforested');
           }
         }
       }

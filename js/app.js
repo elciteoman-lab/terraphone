@@ -1526,6 +1526,53 @@ class App {
       });
     }
 
+    // Granular Ambience Dropdown toggle & sub-sliders
+    const ambienceDropdownBtn = document.getElementById('btn-ambience-dropdown');
+    const ambienceDropdownMenu = document.getElementById('ambience-dropdown-menu');
+
+    if (ambienceDropdownBtn && ambienceDropdownMenu) {
+      ambienceDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = ambienceDropdownMenu.classList.toggle('open');
+        ambienceDropdownBtn.classList.toggle('open', isOpen);
+      });
+    }
+
+    const trafficSlider = document.getElementById('slider-traffic-vol');
+    if (trafficSlider) {
+      trafficSlider.addEventListener('input', (e) => {
+        this.sound.setTrafficVolume(parseFloat(e.target.value));
+      });
+    }
+
+    const hornsSlider = document.getElementById('slider-horns-vol');
+    if (hornsSlider) {
+      hornsSlider.addEventListener('input', (e) => {
+        this.sound.setHornsVolume(parseFloat(e.target.value));
+      });
+    }
+
+    const animalsSlider = document.getElementById('slider-animals-vol');
+    if (animalsSlider) {
+      animalsSlider.addEventListener('input', (e) => {
+        this.sound.setAnimalsVolume(parseFloat(e.target.value));
+      });
+    }
+
+    const birdsSlider = document.getElementById('slider-birds-vol');
+    if (birdsSlider) {
+      birdsSlider.addEventListener('input', (e) => {
+        this.sound.setBirdsVolume(parseFloat(e.target.value));
+      });
+    }
+
+    const voicesSlider = document.getElementById('slider-voices-vol');
+    if (voicesSlider) {
+      voicesSlider.addEventListener('input', (e) => {
+        this.sound.setVoicesVolume(parseFloat(e.target.value));
+      });
+    }
+
     if (lofiSlider) {
       lofiSlider.addEventListener('input', (e) => {
         this.sound.setLoFiVolume(parseFloat(e.target.value));

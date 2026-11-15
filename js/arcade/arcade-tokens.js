@@ -7,24 +7,24 @@
  */
 
 const STORAGE_KEY = 'terraphone_arcade_profile';
-const ZEN_DAILY_LIMIT = 30; // Max 30 tokens per day from passive Zen sessions
+const ZEN_DAILY_LIMIT = 10; // Max 10 tokens per day from passive Zen sessions (balanced economy)
 
 export const COSMETICS_CATALOG = {
   carPaints: [
     { id: 'cyan', name: 'Skyline Cyan', hex: '#38bdf8', cost: 0, unlocked: true },
-    { id: 'obsidian', name: 'Obsidian Midnight', hex: '#0f172a', cost: 10, unlocked: false },
-    { id: 'amber', name: 'Solar Amber', hex: '#f59e0b', cost: 15, unlocked: false },
-    { id: 'emerald', name: 'British Racing Green', hex: '#059669', cost: 25, unlocked: false }
+    { id: 'obsidian', name: 'Obsidian Midnight', hex: '#0f172a', cost: 60, unlocked: false },
+    { id: 'amber', name: 'Solar Amber', hex: '#f59e0b', cost: 120, unlocked: false },
+    { id: 'emerald', name: 'British Racing Green', hex: '#059669', cost: 200, unlocked: false }
   ],
   gliderSkins: [
     { id: 'white', name: 'Aero White', hex: '#f8fafc', cost: 0, unlocked: true },
-    { id: 'aurora', name: 'Prismatic Aurora', hex: '#a855f7', cost: 20, unlocked: false },
-    { id: 'nebula', name: 'Nebula Void', hex: '#6366f1', cost: 30, unlocked: false }
+    { id: 'aurora', name: 'Prismatic Aurora', hex: '#a855f7', cost: 140, unlocked: false },
+    { id: 'nebula', name: 'Nebula Void', hex: '#6366f1', cost: 250, unlocked: false }
   ],
   spiritGlows: [
     { id: 'verdant', name: 'Verdant Wisp', hex: '#10b981', cost: 0, unlocked: true },
-    { id: 'celestial', name: 'Starlight Blue', hex: '#0ea5e9', cost: 15, unlocked: false },
-    { id: 'firefly', name: 'Golden Firefly', hex: '#eab308', cost: 25, unlocked: false }
+    { id: 'celestial', name: 'Starlight Blue', hex: '#0ea5e9', cost: 75, unlocked: false },
+    { id: 'firefly', name: 'Golden Firefly', hex: '#eab308', cost: 160, unlocked: false }
   ]
 };
 
@@ -54,7 +54,7 @@ export class ArcadeTokensManager {
 
     return {
       username: 'EcoExplorer_' + Math.floor(1000 + Math.random() * 9000),
-      tokens: 15, // Welcome gift to let users test cosmetic system immediately
+      tokens: 5, // Modest starter tokens to explore cosmetic shop
       zenMinutes: 0,
       zenDate: new Date().toISOString().slice(0, 10),
       todayZenTokens: 0,
@@ -124,7 +124,7 @@ export class ArcadeTokensManager {
       this.profile.highScores[gameId] = { score, metric };
       isNewBest = true;
       // Bonus tokens for personal record improvement
-      this.addTokens(3, `New Personal Best in ${gameId}`);
+      this.addTokens(2, `New Personal Best in ${gameId}`);
     }
     this.saveProfile();
     return { isNewBest, best: this.profile.highScores[gameId].score };

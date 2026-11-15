@@ -76,8 +76,9 @@ export class FirelineGame {
     this.springs = [];
     this.firmsAnomalies = [];
 
-    for (let x = -30; x <= 30; x++) {
-      for (let y = -30; y <= 30; y++) {
+    // Compact procedural grid for instant lag-free startup
+    for (let x = -22; x <= 22; x++) {
+      for (let y = -22; y <= 22; y++) {
         const dist = Math.hypot(x, y);
         if (dist < 3) continue; // Clear clearing at spawn
 
@@ -95,7 +96,7 @@ export class FirelineGame {
         }
 
         // NASA FIRMS Thermal Anomaly Zones (warm satellite thermal hotspots)
-        if (fract > 0.94 && dist > 8) {
+        if (fract > 0.94 && dist > 7) {
           this.firmsAnomalies.push({
             x: x * this.tileSize,
             y: y * this.tileSize,
@@ -116,8 +117,8 @@ export class FirelineGame {
           });
         }
 
-        // Sacred River Spring at intervals (3 ancient springs to restore)
-        if ((x === 0 && y === 12) || (x === 18 && y === -15) || (x === -20 && y === 20)) {
+        // Sacred River Spring / Wells at designated intervals (3 ancient springs to restore)
+        if ((x === 0 && y === 10) || (x === 14 && y === -12) || (x === -15 && y === 14)) {
           this.springs.push({
             x: x * this.tileSize,
             y: y * this.tileSize,
@@ -129,6 +130,9 @@ export class FirelineGame {
         }
       }
     }
+
+    // Pre-sort trees once during generation to eliminate per-frame sorting overhead
+    this.trees.sort((a, b) => a.y - b.y);
     this.isVictory = false;
   }
 
@@ -159,7 +163,7 @@ export class FirelineGame {
   triggerFireflyMode(duration = 10) {
     this.player.isFirefly = true;
     this.player.fireflyTimer = duration;
-    arcadeTokens.unlockEasterEgg('Golden Firefly Flight', 10);
+    arcadeTokens.unlockEasterEgg('Golden Firefly Flight', 5);
     this.playChime(880);
   }
 
@@ -297,11 +301,10 @@ export class FirelineGame {
         sp.seedsDeposited += deposit;
         this.player.seedsCarried -= deposit;
         this.seedsSaved += deposit;
-        arcadeTokens.addTokens(deposit * 2, 'Restored Forest Spring');
-
         if (sp.seedsDeposited >= sp.seedsNeeded) {
           sp.restored = true;
           this.forestsRestored += 1;
+          arcadeTokens.addTokens(1, 'Restored Forest Spring');
           this.playChime(1040);
         } else {
           this.playChime(780);
@@ -310,7 +313,7 @@ export class FirelineGame {
         // Check overall victory condition (all 3 springs restored)
         if (this.springs.every(s => s.restored) && !this.isVictory) {
           this.isVictory = true;
-          arcadeTokens.addTokens(25, 'Forest Watershed Fully Restored');
+          arcadeTokens.addTokens(5, 'Forest Watershed Fully Restored');
           this.playChime(1200);
         }
       }
@@ -338,24 +341,23 @@ export class FirelineGame {
     ctx.fillStyle = '#0a120c';
     ctx.fillRect(0, 0, width, height);
 
-    // Subtle isometric ground grid lines
+    // Subtle isometric ground grid lines (batched single path for performance)
     ctx.strokeStyle = 'rgba(16, 185, 129, 0.04)';
     ctx.lineWidth = 1;
-    const step = 64;
+    ctx.beginPath();
+    const step = 80;
     for (let x = -width; x < width * 2; x += step) {
-      ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x + height * 1.5, height);
-      ctx.stroke();
-      ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x - height * 1.5, height);
-      ctx.stroke();
     }
+    ctx.stroke();
 
     // 1. Render NASA FIRMS Anomaly Zones (warm ground halos)
     this.firmsAnomalies.forEach(fa => {
       const p = this.worldToIso(fa.x, fa.y);
+      if (p.x < -120 || p.x > width + 120 || p.y < -120 || p.y > height + 120) return;
       const rad = fa.radius * 0.8;
       const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, rad);
       grad.addColorStop(0, 'rgba(245, 158, 11, 0.28)');
@@ -367,36 +369,108 @@ export class FirelineGame {
       ctx.fill();
     });
 
-    // 2. Render Springs
-    this.springs.forEach(sp => {
+    // 2. Render Springs / Wells with distinct Fixed Indicator
+    this.springs.forEach((sp, idx) => {
       const p = this.worldToIso(sp.x, sp.y);
-      ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y, 36, 18, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      if (p.x < -90 || p.x > width + 90 || p.y < -90 || p.y > height + 90) return;
+
+      if (sp.restored) {
+        // --- RESTORED / FIXED WELL ---
+        const time = performance.now() * 0.003;
+        const pulse = Math.sin(time + idx) * 3;
+
+        // Base pond
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.45)';
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, 42 + pulse, 21 + pulse * 0.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Upward luminous fountain beacon column
+        const grad = ctx.createLinearGradient(p.x, p.y, p.x, p.y - 65);
+        grad.addColorStop(0, 'rgba(52, 211, 153, 0.55)');
+        grad.addColorStop(0.7, 'rgba(56, 189, 248, 0.35)');
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 14, p.y);
+        ctx.lineTo(p.x - 4, p.y - 65);
+        ctx.lineTo(p.x + 4, p.y - 65);
+        ctx.lineTo(p.x + 14, p.y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Lotus blossom in center
+        ctx.fillStyle = '#f472b6';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y - 4, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Clear Floating Checkmark Badge: "RESTORED ✓"
+        ctx.fillStyle = 'rgba(6, 78, 59, 0.92)';
+        ctx.strokeStyle = '#34d399';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.roundRect(p.x - 52, p.y - 94, 104, 22, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#34d399';
+        ctx.font = 'bold 11px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`✨ WELL #${idx + 1} FIXED ✓`, p.x, p.y - 79);
+      } else {
+        // --- UNRESTORED WELL ---
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, 36, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        // Progress Ring & Seeds Needed Badge
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(p.x - 55, p.y - 48, 110, 20, 6);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 10.5px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`💧 WELL #${idx + 1} (${sp.seedsDeposited}/${sp.seedsNeeded})`, p.x, p.y - 34);
+      }
     });
 
-    // 3. Render Seeds
+    // 3. Render Seeds (High-performance hardware arcs without software shadowBlur stalls)
     this.seeds.forEach(s => {
       if (s.collected) return;
       const p = this.worldToIso(s.x, s.y);
-      ctx.fillStyle = s.isGolden ? '#facc15' : '#34d399';
-      ctx.shadowColor = s.isGolden ? '#facc15' : '#34d399';
-      ctx.shadowBlur = s.isGolden ? 16 : 8;
+      if (p.x < -20 || p.x > width + 20 || p.y < -20 || p.y > height + 20) return;
+
+      // Outer glow
+      ctx.fillStyle = s.isGolden ? 'rgba(250, 204, 21, 0.28)' : 'rgba(52, 211, 153, 0.28)';
       ctx.beginPath();
-      ctx.arc(p.x, p.y - 6, s.isGolden ? 7 : 4.5, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y - 6, s.isGolden ? 12 : 8, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0;
+
+      // Seed core
+      ctx.fillStyle = s.isGolden ? '#facc15' : '#34d399';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y - 6, s.isGolden ? 6 : 4, 0, Math.PI * 2);
+      ctx.fill();
     });
 
-    // 4. Render Trees (Sorted by Y for depth)
-    const visibleTrees = this.trees.slice().sort((a, b) => a.y - b.y);
-    visibleTrees.forEach(t => {
+    // 4. Render Trees (Pre-sorted by Y in initWorld - zero GC & zero per-frame sorting)
+    for (let i = 0; i < this.trees.length; i++) {
+      const t = this.trees[i];
       const p = this.worldToIso(t.x, t.y);
-      if (p.x < -60 || p.x > width + 60 || p.y < -60 || p.y > height + 60) return;
+      if (p.x < -60 || p.x > width + 60 || p.y < -60 || p.y > height + 60) continue;
 
       // Tree trunk
       ctx.fillStyle = '#1c1917';
@@ -410,7 +484,7 @@ export class FirelineGame {
       ctx.lineTo(p.x + t.size * 0.5, p.y - 10);
       ctx.closePath();
       ctx.fill();
-    });
+    }
 
     // 5. Render Player Spirit & Light Trail
     const spiritColor = arcadeTokens.getEquippedHex('spiritGlow');
@@ -485,7 +559,7 @@ export class FirelineGame {
 
       ctx.fillStyle = '#fbbf24';
       ctx.font = 'bold 16px system-ui, sans-serif';
-      ctx.fillText('🪙 +25 Zen Tokens Awarded', width / 2, height / 2 + 30);
+      ctx.fillText('🪙 +5 Zen Tokens Awarded', width / 2, height / 2 + 30);
 
       ctx.fillStyle = '#94a3b8';
       ctx.font = '12px system-ui, sans-serif';
@@ -494,9 +568,49 @@ export class FirelineGame {
   }
 
   renderHud(ctx, width, height) {
+    // 1. Top-Center Primary Mission Objective Bar
+    const objBoxW = Math.min(460, width - 40);
+    const objBoxH = 58;
+    const objBoxX = (width - objBoxW) / 2;
+    const objBoxY = 18;
+
+    ctx.fillStyle = 'rgba(10, 15, 26, 0.90)';
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(objBoxX, objBoxY, objBoxW, objBoxH, 14);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#34d399';
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('🎯 OBJECTIVE: RESTORE 3 SACRED WELL SPRINGS', objBoxX + 16, objBoxY + 20);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '600 12px system-ui, sans-serif';
+    const wellsStatus = this.springs.map((s, i) => s.restored ? `Well #${i+1} Fixed ✓` : `Well #${i+1} (${s.seedsDeposited}/${s.seedsNeeded})`).join('  ·  ');
+    ctx.fillText(wellsStatus, objBoxX + 16, objBoxY + 38);
+
+    // Progress Bar
+    const barX = objBoxX + 16;
+    const barY = objBoxY + 45;
+    const barW = objBoxW - 32;
+    const barH = 5;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 2.5);
+    ctx.fill();
+
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW * (this.forestsRestored / 3), barH, 2.5);
+    ctx.fill();
+
     const hudY = height - 96;
 
-    // NASA FIRMS Badge (Bottom Left)
+    // 2. NASA FIRMS Badge (Bottom Left)
     ctx.fillStyle = 'rgba(10, 15, 26, 0.88)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
     ctx.lineWidth = 1;
@@ -518,7 +632,7 @@ export class FirelineGame {
     ctx.font = '10.5px system-ui, sans-serif';
     ctx.fillText('Follow blue compass arrow to restore River Springs', 38, hudY + 60);
 
-    // Objective & Seeds (Bottom Right)
+    // 3. Objective & Seeds (Bottom Right)
     ctx.beginPath();
     ctx.roundRect(width - 240, hudY, 216, 72, 14);
     ctx.fill();

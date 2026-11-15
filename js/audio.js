@@ -16,6 +16,16 @@ export class SoundEngine {
     this.ambienceVolume = 0.70;
     this.lofiVolume = 0.0; // Lo-Fi starts at 0 (controlled by bottom-right slider)
 
+    // Granular Ambience Sub-layer Volumes (Traffic, Honking, Animals, Birds, Voices)
+    this.granularVolumes = {
+      traffic: 0.60,
+      horns: 0.40,
+      animals: 0.50,
+      birds: 0.50,
+      voices: 0.40
+    };
+    this.granularGains = {};
+
     // Audio Elements, Web Audio Sources & Gains
     this.audioElements = {};
     this.audioSources = {};
@@ -91,6 +101,15 @@ export class SoundEngine {
     this.ambienceMaster.gain.setValueAtTime(0, this.ctx.currentTime);
     this.ambienceMaster.connect(this.masterGain);
 
+    // Granular Ambience sub-nodes
+    const layers = ['traffic', 'horns', 'animals', 'birds', 'voices'];
+    layers.forEach(layer => {
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(this.granularVolumes[layer], this.ctx.currentTime);
+      g.connect(this.ambienceMaster);
+      this.granularGains[layer] = g;
+    });
+
     // 4. LO-FI MASTER BUS
     this.lofiMaster = this.ctx.createGain();
     this.lofiMaster.gain.setValueAtTime(0, this.ctx.currentTime);
@@ -117,6 +136,13 @@ export class SoundEngine {
     this.loadAudioTrack('ambience_rural', 'audio/ambience_rural.ogg', this.ambienceMaster);
     this.loadAudioTrack('ambience_jungle', 'audio/ambience_jungle.ogg', this.ambienceMaster);
     this.loadAudioTrack('ambience_ocean', 'audio/ambience_ocean.ogg', this.ambienceMaster);
+
+    // Load Granular Ambience Tracks into their dedicated gain nodes
+    this.loadAudioTrack('granular_traffic', 'audio/traffic.ogg', this.granularGains['traffic']);
+    this.loadAudioTrack('granular_horns', 'audio/horns.ogg', this.granularGains['horns']);
+    this.loadAudioTrack('granular_animals', 'audio/nature.ogg', this.granularGains['animals']);
+    this.loadAudioTrack('granular_birds', 'audio/ambience_jungle.ogg', this.granularGains['birds']);
+    this.loadAudioTrack('granular_voices', 'audio/crowd.ogg', this.granularGains['voices']);
 
     // Load Lo-Fi Chillhop Track (Clean chillhop beat with zero rain baked in)
     this.loadAudioTrack('lofi_beat', 'audio/lofi_cloud_watching.ogg', this.lofiMaster);
@@ -275,6 +301,20 @@ export class SoundEngine {
       if (!gainNode) return;
       const targetGain = (audible && type === this.currentEnv) ? 1.0 : 0.0;
       gainNode.gain.setTargetAtTime(targetGain, now, 0.6); // 600ms organic crossfade
+    });
+
+    // Play/Pause and crossfade granular ambience sub-tracks
+    const granularTrackKeys = ['granular_traffic', 'granular_horns', 'granular_animals', 'granular_birds', 'granular_voices'];
+    granularTrackKeys.forEach(k => {
+      const el = this.audioElements[k];
+      const gainNode = this.gains[k];
+      if (audible) {
+        if (el && el.paused) el.play().catch(() => {});
+        if (gainNode) gainNode.gain.setTargetAtTime(1.0, now, 0.4);
+      } else {
+        if (gainNode) gainNode.gain.setTargetAtTime(0, now, 0.2);
+        if (el && !el.paused) el.pause();
+      }
     });
   }
 
@@ -847,6 +887,41 @@ export class SoundEngine {
     this.ambienceVolume = Math.max(0, Math.min(1, v));
     if (this.ctx && this.ambienceMaster && !this.isMuted) {
       this.ambienceMaster.gain.setTargetAtTime(this.ambienceVolume, this.ctx.currentTime, 0.1);
+    }
+  }
+
+  setTrafficVolume(v) {
+    this.granularVolumes.traffic = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.traffic) {
+      this.granularGains.traffic.gain.setTargetAtTime(this.granularVolumes.traffic, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setHornsVolume(v) {
+    this.granularVolumes.horns = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.horns) {
+      this.granularGains.horns.gain.setTargetAtTime(this.granularVolumes.horns, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setAnimalsVolume(v) {
+    this.granularVolumes.animals = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.animals) {
+      this.granularGains.animals.gain.setTargetAtTime(this.granularVolumes.animals, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setBirdsVolume(v) {
+    this.granularVolumes.birds = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.birds) {
+      this.granularGains.birds.gain.setTargetAtTime(this.granularVolumes.birds, this.ctx.currentTime, 0.05);
+    }
+  }
+
+  setVoicesVolume(v) {
+    this.granularVolumes.voices = Math.max(0, Math.min(1, v));
+    if (this.ctx && this.granularGains.voices) {
+      this.granularGains.voices.gain.setTargetAtTime(this.granularVolumes.voices, this.ctx.currentTime, 0.05);
     }
   }
 

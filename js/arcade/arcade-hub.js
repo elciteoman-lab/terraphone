@@ -27,7 +27,17 @@ export const ARCADE_GAMES = [
     icon: '🌧️',
     nasaData: 'NASA GPM IMERG Precipitation',
     desc: 'Slow Roads-inspired scenic driving. Procedural hills, curves, wet asphalt, and the secret Cloud Glider flight mode.',
-    accent: '#38bdf8'
+    accent: '#38bdf8',
+    objective: 'Traverse 4 continuous NASA weather sectors to reach the Valley Research Station at 2,400m. Hug the asphalt, ride the rolling hills, and leap through floating Cloud Rings at hill crests to deploy your Cloud Glider wings.',
+    controls: [
+      { key: 'W / ↑', desc: 'Accelerate' },
+      { key: 'S / ↓', desc: 'Brake / Reverse' },
+      { key: 'A / D or ← / →', desc: 'Steer Left / Right' },
+      { key: 'Space', desc: 'Handbrake / Air Glider' },
+      { key: 'C', desc: 'Toggle Chase / Hood Camera' },
+      { key: 'P', desc: 'Toggle Autopilot Cruise' }
+    ],
+    environmentalImpact: 'Precipitation dynamically shifts based on real-world NASA GPM IMERG microwave and radar satellite data. Monitoring rainfall rates across diverse terrains is essential for assessing freshwater supplies, flash flood hazards, and watershed health.'
   },
   {
     id: 'fireline',
@@ -37,7 +47,14 @@ export const ARCADE_GAMES = [
     icon: '🌲',
     nasaData: 'NASA FIRMS Active Fire Satellite Data',
     desc: 'Guide a luminous forest wanderer through ancient trees. Collect seeds, avoid thermal anomalies, and discover Golden Firefly flight.',
-    accent: '#10b981'
+    accent: '#10b981',
+    objective: 'Explore a tranquil isometric woodland, gather luminous forest seeds, and avoid high-temperature thermal anomalies. Deposit 4 seeds into each of the 3 ancient Sacred Springs to restore the watershed balance.',
+    controls: [
+      { key: 'W / A / S / D or Arrows', desc: 'Move Spirit Wanderer' },
+      { key: 'Spring Proximity', desc: 'Automatically deposits seeds' },
+      { key: 'Golden Seed', desc: 'Golden Firefly high-speed flight boost' }
+    ],
+    environmentalImpact: 'Thermal hotspots correspond to NASA FIRMS (MODIS/VIIRS) satellite thermal detections. Protecting pristine headwater streams and re-seeding fire-prone forests preserves critical wildlife corridors and natural firebreaks.'
   },
   {
     id: 'heat_escape',
@@ -47,7 +64,14 @@ export const ARCADE_GAMES = [
     icon: '🏙️',
     nasaData: 'NASA ECOSTRESS Land Surface Temp',
     desc: 'Navigate city heat islands on a scooter. Chain cool shaded park corridors to prevent heat fatigue.',
-    accent: '#f97316'
+    accent: '#f97316',
+    objective: 'Cruise on your electric scooter across a sun-scorched city to reach the Central Park Oasis at 1,000m. Slalom through tree canopy shade and hydration misting stations to prevent your hydration meter from dropping to zero.',
+    controls: [
+      { key: 'W / S or ↑ / ↓', desc: 'Accelerate / Decelerate' },
+      { key: 'A / D or ← / →', desc: 'Steer & Lane Shift' },
+      { key: 'Space / Shift', desc: 'Electric Turbo Boost' }
+    ],
+    environmentalImpact: 'Driven by NASA ECOSTRESS thermal measurements aboard the ISS. Unshaded asphalt surfaces can exceed 50°C (122°F), whereas tree-shaded parks lower ambient temperatures by up to 12°C, demonstrating the lifesaving power of urban greening.'
   },
   {
     id: 'water_keeper',
@@ -57,7 +81,13 @@ export const ARCADE_GAMES = [
     icon: '💧',
     nasaData: 'NASA SMAP Soil Moisture Radiometer',
     desc: 'Guide an agile water droplet across varied soil strata to nourish blooming natural vegetation.',
-    accent: '#06b6d4'
+    accent: '#06b6d4',
+    objective: 'Guide an agile water droplet across varied soil strata (clay, loam, sand) to irrigate 8 parched soil patches and revive blooming wildflowers before evaporating under the blazing sun.',
+    controls: [
+      { key: 'Space / Click / W', desc: 'Ascend / Fluid Leap' },
+      { key: 'A / D or ← / →', desc: 'Adjust Trajectory' }
+    ],
+    environmentalImpact: 'Powered by NASA SMAP (Soil Moisture Active Passive) radiometer observations. Topsoil moisture regulation directly impacts crop yields, groundwater recharge, and global carbon sequestration in natural grasslands.'
   },
   {
     id: 'cloud_courier',
@@ -67,7 +97,13 @@ export const ARCADE_GAMES = [
     icon: '☁️',
     nasaData: 'NASA OMI SO₂/NO₂ & GPM',
     desc: 'Fly as a nimblest cloud through clean air channels while avoiding industrial trace gas pollution plumes.',
-    accent: '#818cf8'
+    accent: '#818cf8',
+    objective: 'Fly through high-altitude clean air corridors while dodging toxic sulfur dioxide (SO₂) and nitrogen dioxide (NO₂) plumes emitted by industrial valleys to deliver pure rain to the mountain community.',
+    controls: [
+      { key: 'W / S or ↑ / ↓', desc: 'Ascend / Descend' },
+      { key: 'Space', desc: 'Thermal Lift Glide' }
+    ],
+    environmentalImpact: 'Incorporates NASA Aura OMI tropospheric air quality satellite measurements. Clean air corridors demonstrate how reducing factory emissions and vehicular pollutants prevents acid rain and protects human respiratory health.'
   },
   {
     id: 'ozone_drift',
@@ -77,7 +113,13 @@ export const ARCADE_GAMES = [
     icon: '🛰️',
     nasaData: 'NASA Ozone Watch & Aura OMI',
     desc: 'Drift through the upper atmosphere in a research probe collecting stratospheric ozone samples.',
-    accent: '#a855f7'
+    accent: '#a855f7',
+    objective: 'Pilot a high-altitude atmospheric research probe across the stratosphere. Collect 8 pure ozone research canisters while avoiding harmful ultraviolet solar radiation pockets and space debris.',
+    controls: [
+      { key: 'W / A / S / D or Arrows', desc: 'Thruster Direction' },
+      { key: 'Space', desc: 'Inertial Stabilizer' }
+    ],
+    environmentalImpact: 'Reflects NASA Ozone Watch daily satellite observations. The stratospheric ozone layer absorbs harmful ultraviolet-B radiation, safeguarding terrestrial ecosystems, marine phytoplankton, and human skin health.'
   },
   {
     id: 'coral_current',
@@ -87,7 +129,13 @@ export const ARCADE_GAMES = [
     icon: '🪸',
     nasaData: 'NOAA Coral Reef Watch Bleaching Stress',
     desc: 'Swim as a resilient sea turtle navigating vibrant barrier reefs and seeking cooling ocean upwellings.',
-    accent: '#f43f5e'
+    accent: '#f43f5e',
+    objective: 'Swim as an agile sea turtle along a stressed barrier reef. Seek cold-water upwelling thermal currents to revive bleached coral polyps along your 1,200m journey to the Marine Sanctuary.',
+    controls: [
+      { key: 'Space / ↑ / W', desc: 'Paddle Upward' },
+      { key: '↓ / S', desc: 'Dive Deeper' }
+    ],
+    environmentalImpact: 'Incorporates NOAA Coral Reef Watch 5km satellite sea surface temperature anomaly metrics. Deep cold-water upwellings provide critical thermal refugia that rescue fragile reef ecosystems from devastating marine heatwaves.'
   },
   {
     id: 'last_forest',
@@ -97,7 +145,13 @@ export const ARCADE_GAMES = [
     icon: '🍃',
     nasaData: 'NASA / USGS Landsat Forest Canopy Cover',
     desc: 'Glide as a winged sycamore seed riding thermal updrafts above lush, continuous forest canopies.',
-    accent: '#34d399'
+    accent: '#34d399',
+    objective: 'Glide as an aerodynamic sycamore seed riding thermal updrafts. Disperse 10 seeds across clearings to establish contiguous forest cover before losing altitude.',
+    controls: [
+      { key: 'A / D or ← / →', desc: 'Bank & Steer' },
+      { key: 'W / S or ↑ / ↓', desc: 'Pitch Up / Dive for Speed' }
+    ],
+    environmentalImpact: 'Based on NASA/USGS Landsat global tree canopy cover monitoring. Expanding contiguous forest corridors prevents habitat fragmentation, restores biodiversity highways, and bolsters planetary carbon sinks.'
   }
 ];
 
@@ -295,6 +349,40 @@ export class ArcadeHub {
           </div>
         </div>
 
+        <!-- Game Briefing & Environmental Science Modal -->
+        <div id="arcade-briefing-modal" class="modal-backdrop" style="display: none;">
+          <div class="modal-dialog arcade-briefing-dialog">
+            <div class="modal-header briefing-header">
+              <div class="briefing-header-left">
+                <span id="briefing-icon" class="briefing-icon">🎮</span>
+                <div>
+                  <h2 id="briefing-title" class="modal-title">Mission Briefing</h2>
+                  <span id="briefing-tag" class="sugg-tag">NASA Earth Science</span>
+                </div>
+              </div>
+              <button id="arcade-btn-close-briefing" class="modal-close" aria-label="Close briefing">✕</button>
+            </div>
+            <div class="modal-content briefing-content">
+              <div class="briefing-section">
+                <h4 class="briefing-section-title">🎯 What You Need To Do</h4>
+                <p id="briefing-objective" class="briefing-text"></p>
+              </div>
+              <div class="briefing-section">
+                <h4 class="briefing-section-title">🕹️ Controls & Navigation</h4>
+                <div id="briefing-controls" class="briefing-controls-grid"></div>
+              </div>
+              <div class="briefing-section briefing-section-science">
+                <h4 class="briefing-section-title">🌍 Environmental Impact & NASA Science</h4>
+                <p id="briefing-impact" class="briefing-text"></p>
+              </div>
+              <div class="briefing-action-row">
+                <button id="btn-cancel-briefing" class="briefing-btn briefing-btn-secondary" type="button">Back to Arcade</button>
+                <button id="btn-start-briefing-mission" class="briefing-btn briefing-btn-primary" type="button">🚀 Start Mission</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
     `;
   }
@@ -305,12 +393,29 @@ export class ArcadeHub {
       this.exitToGlobe();
     });
 
-    // Launch game buttons on cards
+    // Launch game buttons on cards -> open mission briefing card
     this.container.querySelectorAll('.arcade-card, .arcade-play-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const gameId = btn.getAttribute('data-game');
-        if (gameId) this.launchGame(gameId);
+        if (gameId) this.openGameBriefing(gameId);
       });
+    });
+
+    // Briefing modal handlers
+    const briefingModal = document.getElementById('arcade-briefing-modal');
+    document.getElementById('arcade-btn-close-briefing')?.addEventListener('click', () => {
+      this.closeGameBriefing();
+    });
+    document.getElementById('btn-cancel-briefing')?.addEventListener('click', () => {
+      this.closeGameBriefing();
+    });
+    document.getElementById('btn-start-briefing-mission')?.addEventListener('click', () => {
+      const gid = this.pendingBriefingGameId;
+      this.closeGameBriefing();
+      if (gid) this.launchGame(gid);
+    });
+    briefingModal?.addEventListener('click', (e) => {
+      if (e.target === briefingModal) this.closeGameBriefing();
     });
 
     // Leave active game button
@@ -423,6 +528,46 @@ export class ArcadeHub {
         costEl.textContent = isUnlocked ? (isEquipped ? 'Equipped' : 'Equip') : `${itemEl.getAttribute('data-cost')} 🪙`;
       }
     });
+  }
+
+  openGameBriefing(gameId) {
+    const game = ARCADE_GAMES.find(g => g.id === gameId);
+    if (!game) {
+      this.launchGame(gameId);
+      return;
+    }
+    this.pendingBriefingGameId = gameId;
+
+    const modal = document.getElementById('arcade-briefing-modal');
+    const iconEl = document.getElementById('briefing-icon');
+    const titleEl = document.getElementById('briefing-title');
+    const tagEl = document.getElementById('briefing-tag');
+    const objEl = document.getElementById('briefing-objective');
+    const controlsEl = document.getElementById('briefing-controls');
+    const impactEl = document.getElementById('briefing-impact');
+
+    if (iconEl) iconEl.textContent = game.icon;
+    if (titleEl) titleEl.textContent = `${game.title} — ${game.subtitle}`;
+    if (tagEl) tagEl.textContent = game.nasaData;
+    if (objEl) objEl.textContent = game.objective || game.desc;
+    if (impactEl) impactEl.textContent = game.environmentalImpact || 'Explores real NASA and NOAA satellite observations.';
+
+    if (controlsEl) {
+      controlsEl.innerHTML = (game.controls || []).map(c => `
+        <div class="briefing-control-item">
+          <kbd class="briefing-kbd">${c.key}</kbd>
+          <span class="briefing-control-desc">${c.desc}</span>
+        </div>
+      `).join('');
+    }
+
+    if (modal) modal.style.display = 'flex';
+  }
+
+  closeGameBriefing() {
+    const modal = document.getElementById('arcade-briefing-modal');
+    if (modal) modal.style.display = 'none';
+    this.pendingBriefingGameId = null;
   }
 
   launchGame(gameId) {
