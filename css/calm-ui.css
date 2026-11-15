@@ -296,11 +296,31 @@ body:not(.zen-mode) .exit-zen-btn { display: none !important; }
 .arrival { display: none; }
 .first-arrival .arrival {
   position: fixed; inset: 0; z-index: 1100; display: grid; place-items: center; pointer-events: none;
-  color: #eeefe8; background: #101817; animation: arrival-out 1.5s both;
+  color: #f2f0e4; background: radial-gradient(ellipse at 50% 48%, #1b2925, #101917 52%, #0c1413);
+  animation: arrival-out 4.4s both;
 }
-.arrival span { font-size: clamp(42px, 6vw, 82px); font-weight: 550; letter-spacing: -.065em; animation: arrival-word 1.05s both; }
-@keyframes arrival-word { from { opacity: 0; transform: translateY(6px); } 55%, to { opacity: 1; transform: translateY(0); } }
-@keyframes arrival-out { 0%, 57% { opacity: 1; } to { opacity: 0; } }
+.arrival-lockup { display: grid; justify-items: center; position: relative; }
+.arrival-symbol { width: clamp(90px, 11vw, 128px); aspect-ratio: 1; animation: arrival-rise 3s both; }
+.arrival-orbit { display: block; width: 100%; height: 100%; animation: arrival-spin 3.2s cubic-bezier(.37,.02,.18,1) both; }
+.arrival-word {
+  position: absolute; top: 100%; font-size: clamp(33px, 4vw, 53px); font-weight: 550;
+  letter-spacing: -.064em; line-height: 1; animation: arrival-type 1.12s .98s both;
+}
+@keyframes arrival-spin {
+  from { transform: rotate(-346deg); }
+  to { transform: rotate(0); }
+}
+@keyframes arrival-rise {
+  0% { opacity: 0; transform: translateY(8px) scale(.82); }
+  25% { opacity: 1; }
+  68%, 100% { opacity: 1; transform: translateY(-27px) scale(1); }
+}
+@keyframes arrival-type {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(-17px); }
+}
+@keyframes arrival-out { 0%, 74% { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .first-arrival .arrival { display: none; } }
 body:not([data-experience="rain"]) #btn-brand { color: #f2f1e8; text-shadow: 0 1px 7px #06110d99; }
 #hud-bottom-right .ambience-dropdown-menu { background: var(--tag-bg); border-color: var(--panel-border); }
 #hud-bottom-right .mixer-group-ambience { display: flex; flex-direction: column; align-items: stretch; }

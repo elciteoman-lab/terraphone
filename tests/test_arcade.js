@@ -45,7 +45,11 @@ class MockCanvasContext {
   bezierCurveTo() {}
   quadraticCurveTo() {}
   setLineDash() {}
-  drawImage() {}
+  drawImage() { this.imagesDrawn = (this.imagesDrawn || 0) + 1; }
+  setTransform() {}
+  clip() {}
+  createImageData(width, height) { return { data: new Uint8ClampedArray(width * height * 4) }; }
+  putImageData() {}
   save() {}
   restore() {}
   translate() {}
@@ -122,6 +126,7 @@ global.window = {
 
 global.document = {
   createElement: (tag) => {
+    if (tag === 'canvas') return new MockCanvas();
     const el = {
       tagName: tag.toUpperCase(),
       classList: {
@@ -326,19 +331,74 @@ async function runArcadeTests() {
   console.log('\n--- TEST 4: ArcadeHub Lifecycle & Game Orchestration ---');
   assert.deepEqual(ARCADE_GAMES.map(game => game.id), ['fireline', 'heat_escape', 'cloud_courier', 'ozone_drift', 'coral_current', 'last_forest']);
 
+  for (const game of [fireline, heat, cloud, ozone, coral, forest]) {
+    game.canvas = new MockCanvas(390, 740);
+    game.ctx = game.canvas.getContext('2d');
+    const before = arcadeTokens.profile.tokens;
+    game.render();
+    const art = game.art;
+    const initialSurfaces = [...art.cache.values()];
+    game.render();
+    assert.equal(game.art, art);
+    assert.ok(initialSurfaces.length > 0 && initialSurfaces.every(surface => [...art.cache.values()].includes(surface)));
+    assert.equal(game.ctx.imagesDrawn, 2);
+    assert.equal(arcadeTokens.profile.tokens, before);
+    const events = [];
+    game.onResultChange = ended => events.push(ended);
+    game.isGameOver = true;
+    game.render();
+    game.render();
+    assert.equal(game.ctx.imagesDrawn, 3, 'Finished worlds should freeze');
+    game.isGameOver = false;
+    game.render();
+    assert.deepEqual(events, [true, false]);
+    game.canvas.width = 500;
+    game.render();
+    assert.notEqual(game.art, art, 'Resize must rebuild resolution-dependent art');
+  }
+
+  const idleQueue = new Map();
+  let idleId = 0;
+  window.requestIdleCallback = cb => { idleQueue.set(++idleId, cb); return idleId; };
+  window.cancelIdleCallback = id => idleQueue.delete(id);
+  for (const Game of [FirelineGame, OzoneDriftGame]) {
+    const work = Game.prepareArtwork(390, 740);
+    const [id, step] = idleQueue.entries().next().value;
+    idleQueue.delete(id);
+    step({ timeRemaining: () => 0 });
+    work.cancel();
+    assert.equal(idleQueue.size, 0);
+    assert.ok(work.art.cache.size > 0);
+    const game = new Game(new MockCanvas(390, 740), null, () => {});
+    game.art = work.art;
+    game.render();
+    assert.equal(game.art, work.art, 'A quick launch must finish its partially prepared artwork');
+    game.stop();
+  }
+
   const mockContainer = document.createElement('main');
   mockContainer.querySelector = () => document.createElement('div');
   const hub = new ArcadeHub(mockContainer, mockAudio);
   assert.strictEqual(hub.activeGameInstance, null, 'Hub should start with no active game');
 
   for (const { id } of ARCADE_GAMES) {
-    hub.launchGame(id);
+    await hub.launchGame(id);
     assert.equal(hub.activeGameId, id);
     assert.ok(hub.activeGameInstance.isRunning, id + ' should run');
     hub.closeActiveGame();
     assert.equal(hub.activeGameInstance, null);
     assert.equal(hub.activeGameId, null);
   }
+
+  const abandonedLaunch = hub.launchGame('last_forest');
+  hub.closeActiveGame();
+  await abandonedLaunch;
+  assert.equal(hub.activeGameInstance, null, 'Leaving a loading game must cancel its pending launch');
+  const firstLaunch = hub.launchGame('cloud_courier');
+  const latestLaunch = hub.launchGame('ozone_drift');
+  await Promise.all([firstLaunch, latestLaunch]);
+  assert.ok(hub.activeGameInstance instanceof OzoneDriftGame);
+  hub.closeActiveGame();
 
   console.log('✅ ArcadeHub coordination verified!\n');
 

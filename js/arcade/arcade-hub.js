@@ -7,14 +7,23 @@
  */
 
 import { arcadeTokens, COSMETICS_CATALOG } from './arcade-tokens.js';
-import { FirelineGame } from './fireline.js';
-import {
-  HeatEscapeGame,
-  CloudCourierGame,
-  OzoneDriftGame,
-  CoralCurrentGame,
-  LastForestGame
-} from './mini-games.js';
+const gameLoaders = {
+  fireline: () => import('./fireline.js').then(m => m.FirelineGame),
+  heat_escape: () => import('./heat-escape.js').then(m => m.HeatEscapeGame),
+  cloud_courier: () => import('./cloud-courier.js').then(m => m.CloudCourierGame),
+  ozone_drift: () => import('./ozone-drift.js').then(m => m.OzoneDriftGame),
+  coral_current: () => import('./coral-current.js').then(m => m.CoralCurrentGame),
+  last_forest: () => import('./last-forest.js').then(m => m.LastForestGame)
+};
+
+const finishTitles = {
+  fireline: 'The springs are flowing',
+  heat_escape: 'Out of water',
+  cloud_courier: 'Flight ended',
+  ozone_drift: 'Orbit surveyed',
+  coral_current: 'Dive ended',
+  last_forest: 'Glide ended'
+};
 
 export const ARCADE_GAMES = [
   {
@@ -61,10 +70,10 @@ export const ARCADE_GAMES = [
     title: 'Ozone Drift',
     tag: 'Orbital exploration',
     nasaData: 'NASA Ozone Watch & Aura OMI',
-    objective: 'Collect 15 ozone canisters while steering clear of ultraviolet pockets and orbital debris.',
+    objective: 'Turn the probe and fire its thruster to collect 15 ozone samples.',
     controls: [
-      { key: 'W / A / S / D or Arrows', desc: 'Thruster Direction' },
-      { key: 'Space', desc: 'Inertial Stabilizer' }
+      { key: 'A / D or ← / →', desc: 'Rotate the probe' },
+      { key: 'W or ↑', desc: 'Fire the thruster' }
     ],
     environmentalImpact: 'Reflects NASA Ozone Watch daily satellite observations. The stratospheric ozone layer absorbs harmful ultraviolet-B radiation, safeguarding terrestrial ecosystems, marine phytoplankton, and human skin health.'
   },
@@ -157,6 +166,12 @@ export class ArcadeHub {
           </div>
 
           <canvas id="arcade-canvas" class="arcade-canvas"></canvas>
+          <div id="arcade-result" class="arcade-result" hidden>
+            <div class="arcade-result-card">
+              <h2 id="arcade-result-title" aria-live="polite"></h2>
+              <button type="button" id="arcade-replay" class="arcade-hud-btn">Play again</button>
+            </div>
+          </div>
         </div>
 
         <!-- Cosmetic Shop Modal -->
@@ -395,17 +410,35 @@ export class ArcadeHub {
     document.getElementById('btn-start-briefing-mission')?.addEventListener('click', (e) => {
       e.stopPropagation();
       const gid = this.pendingBriefingGameId;
+      const art = this.takeBriefingArt(gid);
       this.closeGameBriefing();
-      if (gid) this.launchGame(gid);
+      if (gid) this.launchGame(gid, art);
     });
-    briefingModal?.addEventListener('close', () => { this.pendingBriefingGameId = null; });
+    briefingModal?.addEventListener('close', () => {
+      if (briefingModal.open) return;
+      this.pendingBriefingGameId = null;
+      this.takeBriefingArt();
+    });
     briefingModal?.addEventListener('click', (e) => {
       if (e.target === briefingModal) this.closeGameBriefing();
+    });
+
+    const viewport = document.getElementById('arcade-game-viewport');
+    viewport?.addEventListener('keydown', event => {
+      if (event.target.closest('button') && (event.key === ' ' || event.key === 'Enter')) event.stopPropagation();
     });
 
     // Leave active game button
     document.getElementById('arcade-btn-leave-game')?.addEventListener('click', () => {
       this.closeActiveGame();
+    });
+
+    document.getElementById('arcade-replay')?.addEventListener('click', () => {
+      const game = this.activeGameInstance;
+      if (!game || (!game.isGameOver && !game.isVictory)) return;
+      if (!game.restart) { this.launchGame(this.activeGameId); return; }
+      game.restart();
+      game.canvas.focus({ preventScroll: true });
     });
 
     // Pause button
@@ -512,7 +545,15 @@ export class ArcadeHub {
   openGameBriefing(gameId) {
     const game = ARCADE_GAMES.find(g => g.id === gameId);
     if (!game) return;
+    this.takeBriefingArt();
     this.pendingBriefingGameId = gameId;
+    const briefing = this.artBriefing = { gameId };
+    // Fetch the selected module and prepare its scenery while the controls are open.
+    gameLoaders[gameId]().then(Game => {
+      if (this.artBriefing === briefing) {
+        briefing.work = Game.prepareArtwork?.(window.innerWidth, window.innerHeight);
+      }
+    }).catch(() => {});
 
     const modal = document.getElementById('arcade-briefing-modal');
     const titleEl = document.getElementById('briefing-title');
@@ -538,16 +579,25 @@ export class ArcadeHub {
     if (modal && !modal.open) modal.showModal();
   }
 
+  takeBriefingArt(gameId) {
+    const briefing = this.artBriefing;
+    this.artBriefing = null;
+    briefing?.work?.cancel();
+    return briefing && briefing.gameId === gameId ? briefing.work?.art : null;
+  }
+
   closeGameBriefing() {
+    this.takeBriefingArt();
     const modal = document.getElementById('arcade-briefing-modal');
     if (modal?.open) modal.close();
     this.pendingBriefingGameId = null;
   }
 
-  launchGame(gameId) {
+  async launchGame(gameId, preparedArt = null) {
     if (!ARCADE_GAMES.some(game => game.id === gameId)) return;
     this.closeActiveGame();
     this.activeGameId = gameId;
+    const launch = this.pendingLaunch = {};
 
     this.audioCtx ??= window.app?.sound?.getSharedContext();
     if (this.audioCtx?.state === 'suspended') this.audioCtx.resume().catch(() => {});
@@ -562,7 +612,7 @@ export class ArcadeHub {
     const viewportEl = document.getElementById('arcade-game-viewport');
     const canvas = document.getElementById('arcade-canvas');
     const pauseBtn = document.getElementById('arcade-btn-pause-game');
-    if (pauseBtn) pauseBtn.innerHTML = '<span>Pause</span>';
+    if (pauseBtn) { pauseBtn.hidden = false; pauseBtn.textContent = 'Pause'; }
 
     // Set canvas dimensions
     canvas.width = window.innerWidth;
@@ -575,38 +625,36 @@ export class ArcadeHub {
 
     // Instantiate and start game
     try {
-      switch (gameId) {
-        case 'fireline':
-          this.activeGameInstance = new FirelineGame(canvas, this.audioCtx, onExit);
-          break;
-        case 'heat_escape':
-          this.activeGameInstance = new HeatEscapeGame(canvas, this.audioCtx, onExit);
-          break;
-        case 'cloud_courier':
-          this.activeGameInstance = new CloudCourierGame(canvas, this.audioCtx, onExit);
-          break;
-        case 'ozone_drift':
-          this.activeGameInstance = new OzoneDriftGame(canvas, this.audioCtx, onExit);
-          break;
-        case 'coral_current':
-          this.activeGameInstance = new CoralCurrentGame(canvas, this.audioCtx, onExit);
-          break;
-        case 'last_forest':
-          this.activeGameInstance = new LastForestGame(canvas, this.audioCtx, onExit);
-          break;
-        default:
-          return;
-      }
+      const Game = await gameLoaders[gameId]();
+      if (this.pendingLaunch !== launch) return;
+      const game = this.activeGameInstance = new Game(canvas, this.audioCtx, onExit);
+      game.art = preparedArt;
+      game.onResultChange = finished => {
+        const result = document.getElementById('arcade-result');
+        result.hidden = !finished;
+        pauseBtn.hidden = finished;
+        if (finished) {
+          document.getElementById('arcade-result-title').textContent =
+            gameId === 'last_forest' && game.isVictory ? 'The canopy is growing' : finishTitles[gameId];
+          document.getElementById('arcade-replay').focus({ preventScroll: true });
+        } else {
+          canvas.focus({ preventScroll: true });
+        }
+      };
       this.activeGameInstance.start();
       canvas.tabIndex = -1;
       canvas.focus({ preventScroll: true });
     } catch (err) {
+      if (this.pendingLaunch !== launch) return;
       this.closeActiveGame();
       console.error(`Failed to launch arcade game [${gameId}]:`, err);
     }
   }
 
   closeActiveGame() {
+    this.pendingLaunch = null;
+    const result = document.getElementById('arcade-result');
+    if (result) result.hidden = true;
     const lastGame = this.activeGameId;
     if (this.activeGameInstance) {
       this.activeGameInstance.stop();
@@ -617,7 +665,7 @@ export class ArcadeHub {
     const hubEl = document.getElementById('arcade-hub-content');
     const viewportEl = document.getElementById('arcade-game-viewport');
     const pauseBtn = document.getElementById('arcade-btn-pause-game');
-    if (pauseBtn) pauseBtn.innerHTML = '<span>Pause</span>';
+    if (pauseBtn) { pauseBtn.hidden = false; pauseBtn.textContent = 'Pause'; }
 
     // Restore global HUD capsules
     const hudLeft = document.getElementById('hud-top-left');

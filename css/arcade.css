@@ -87,9 +87,9 @@
 
 .arcade-hud-controls {
   position: absolute;
-  top: 18px;
-  left: 20px;
-  right: 20px;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  right: max(16px, env(safe-area-inset-right));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -99,37 +99,27 @@
 
 .arcade-hud-btn {
   pointer-events: auto;
-  background: rgba(10, 15, 26, 0.88);
-  backdrop-filter: blur(14px);
-  border: 1px solid var(--panel-border);
-  color: var(--text-main);
-  padding: 7px 14px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 600;
+  min-height: 42px;
+  padding: 8px 16px;
+  border: 1px solid #87968a;
+  border-radius: 24px;
+  background: #15201e;
+  color: #f4f1de;
+  font: 600 13px system-ui, sans-serif;
   cursor: pointer;
-  transition: var(--trans-fast);
 }
-
-.arcade-hud-btn:hover {
-  background: var(--panel-bg-hover);
-  border-color: var(--accent);
+.arcade-hud-btn:hover { background: #34443b; }
+.arcade-hud-btn:focus-visible { outline: 2px solid #f4e6b0; outline-offset: 3px; }
+.arcade-result:not([hidden]) {
+  position: absolute; inset: 0; display: grid; place-items: center; background: #111e1a55;
 }
-
-.arcade-game-banner {
-  display: none !important; /* Hidden in-game to keep milestones and achievement banners unobstructed */
-  pointer-events: none;
-  background: rgba(10, 15, 26, 0.88);
-  backdrop-filter: blur(14px);
-  border: 1px solid var(--panel-border);
-  padding: 6px 16px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-main);
-  align-items: center;
-  gap: 7px;
+.arcade-result-card {
+  padding: 24px 34px; background: #15201e; color: #f4f1de; text-align: center;
+  border: 1px solid #778278; box-shadow: 4px 4px 0 #16231d66;
 }
+.arcade-result-card h2 { margin: 0 0 14px; font: 520 clamp(23px, 4vw, 35px) system-ui, sans-serif; letter-spacing: -.045em; }
+.arcade-result-card button { color: #1e2821; background: #f1edd7; }
+.arcade-result-card button:hover { background: #dedabd; }
 
 /* Toasts */
 .arcade-toast {
