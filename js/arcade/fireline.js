@@ -116,16 +116,20 @@ export class FirelineGame {
           });
         }
 
-        // Sacred River Spring at intervals
+        // Sacred River Spring at intervals (3 ancient springs to restore)
         if ((x === 0 && y === 12) || (x === 18 && y === -15) || (x === -20 && y === 20)) {
           this.springs.push({
             x: x * this.tileSize,
             y: y * this.tileSize,
-            active: true
+            active: true,
+            restored: false,
+            seedsNeeded: 4,
+            seedsDeposited: 0
           });
         }
       }
     }
+    this.isVictory = false;
   }
 
   initInput() {
@@ -219,20 +223,29 @@ export class FirelineGame {
   }
 
   update(dt) {
-    // Movement vector
-    let dx = 0;
-    let dy = 0;
-    if (this.keys.up) dy -= 1;
-    if (this.keys.down) dy += 1;
-    if (this.keys.left) dx -= 1;
-    if (this.keys.right) dx += 1;
+    if (this.isVictory) return;
 
-    const len = Math.hypot(dx, dy);
+    // Movement: Convert screen intent (WASD / Arrows) to isometric world direction
+    let sx = 0;
+    let sy = 0;
+    if (this.keys.up) sy -= 1;
+    if (this.keys.down) sy += 1;
+    if (this.keys.left) sx -= 1;
+    if (this.keys.right) sx += 1;
+
     const curSpeed = this.player.isFirefly ? this.player.speed * 1.5 : this.player.speed;
 
-    if (len > 0) {
-      this.player.vx = (dx / len) * curSpeed;
-      this.player.vy = (dy / len) * curSpeed;
+    if (sx !== 0 || sy !== 0) {
+      const sLen = Math.hypot(sx, sy);
+      const nSx = sx / sLen;
+      const nSy = sy / sLen;
+      const cos30 = Math.cos(Math.PI / 6);
+      const sin30 = Math.sin(Math.PI / 6);
+      const wx = (nSx / cos30 + nSy / sin30) / 2;
+      const wy = (nSy / sin30 - nSx / cos30) / 2;
+      const wLen = Math.hypot(wx, wy);
+      this.player.vx = (wx / wLen) * curSpeed;
+      this.player.vy = (wy / wLen) * curSpeed;
     } else {
       this.player.vx *= 0.8;
       this.player.vy *= 0.8;
@@ -277,14 +290,29 @@ export class FirelineGame {
       }
     });
 
-    // Spring restoration deposit
+    // Sacred Spring restoration deposit
     this.springs.forEach(sp => {
-      if (this.player.seedsCarried > 0 && Math.hypot(this.player.x - sp.x, this.player.y - sp.y) < 45) {
-        this.seedsSaved += this.player.seedsCarried;
-        arcadeTokens.addTokens(this.player.seedsCarried * 2, 'Restored Forest Spring');
-        this.player.seedsCarried = 0;
-        this.forestsRestored += 1;
-        this.playChime(1040);
+      if (!sp.restored && this.player.seedsCarried > 0 && Math.hypot(this.player.x - sp.x, this.player.y - sp.y) < 55) {
+        const deposit = Math.min(this.player.seedsCarried, sp.seedsNeeded - sp.seedsDeposited);
+        sp.seedsDeposited += deposit;
+        this.player.seedsCarried -= deposit;
+        this.seedsSaved += deposit;
+        arcadeTokens.addTokens(deposit * 2, 'Restored Forest Spring');
+
+        if (sp.seedsDeposited >= sp.seedsNeeded) {
+          sp.restored = true;
+          this.forestsRestored += 1;
+          this.playChime(1040);
+        } else {
+          this.playChime(780);
+        }
+
+        // Check overall victory condition (all 3 springs restored)
+        if (this.springs.every(s => s.restored) && !this.isVictory) {
+          this.isVictory = true;
+          arcadeTokens.addTokens(25, 'Forest Watershed Fully Restored');
+          this.playChime(1200);
+        }
       }
     });
 
@@ -416,46 +444,94 @@ export class FirelineGame {
     }
     ctx.restore();
 
-    // 6. On-screen NASA FIRMS HUD
+    // 5. Nearest Sacred Spring Compass Indicator
+    const unrestored = this.springs.filter(s => !s.restored);
+    if (unrestored.length > 0) {
+      unrestored.sort((a, b) => Math.hypot(this.player.x - a.x, this.player.y - a.y) - Math.hypot(this.player.x - b.x, this.player.y - b.y));
+      const target = unrestored[0];
+      const targetIso = this.worldToIso(target.x, target.y);
+      const angle = Math.atan2(targetIso.y - pp.y, targetIso.x - pp.x);
+
+      ctx.save();
+      ctx.translate(pp.x, pp.y);
+      ctx.rotate(angle);
+      ctx.fillStyle = '#38bdf8';
+      ctx.beginPath();
+      ctx.moveTo(34, 0);
+      ctx.lineTo(24, -6);
+      ctx.lineTo(26, 0);
+      ctx.lineTo(24, 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 6. On-screen NASA FIRMS HUD (Bottom-anchored to never collide with top buttons)
     this.renderHud(ctx, width, height);
+
+    // 7. Victory Screen
+    if (this.isVictory) {
+      ctx.fillStyle = 'rgba(3, 7, 18, 0.88)';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = '#10b981';
+      ctx.font = '800 28px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('✨ ANCIENT WATERSHED RESTORED! ✨', width / 2, height / 2 - 40);
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '500 14px system-ui, sans-serif';
+      ctx.fillText('All 3 Sacred River Springs are flowing again with clean alpine runoff.', width / 2, height / 2 - 6);
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = 'bold 16px system-ui, sans-serif';
+      ctx.fillText('🪙 +25 Zen Tokens Awarded', width / 2, height / 2 + 30);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '12px system-ui, sans-serif';
+      ctx.fillText('Press Esc or Exit Game to claim rewards and explore other games', width / 2, height / 2 + 65);
+    }
   }
 
   renderHud(ctx, width, height) {
-    // NASA FIRMS Badge
+    const hudY = height - 96;
+
+    // NASA FIRMS Badge (Bottom Left)
     ctx.fillStyle = 'rgba(10, 15, 26, 0.88)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(24, 24, 300, 68, 14);
+    ctx.roundRect(24, hudY, 320, 72, 14);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#f59e0b';
     ctx.font = 'bold 11px system-ui, sans-serif';
-    ctx.fillText('🛰️ NASA FIRMS THERMAL SATELLITE DATA', 38, 44);
+    ctx.textAlign = 'left';
+    ctx.fillText('🛰️ NASA FIRMS THERMAL SATELLITE DATA', 38, hudY + 22);
 
     ctx.fillStyle = '#f8fafc';
     ctx.font = 'bold 13.5px system-ui, sans-serif';
-    ctx.fillText(`MODIS / VIIRS Active Fire Alerts`, 38, 63);
+    ctx.fillText(`MODIS / VIIRS Active Fire Alerts`, 38, hudY + 43);
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10.5px system-ui, sans-serif';
-    ctx.fillText('Thermal anomalies guide safe ecological corridors', 38, 79);
+    ctx.fillText('Follow blue compass arrow to restore River Springs', 38, hudY + 60);
 
-    // Score & Seeds
+    // Objective & Seeds (Bottom Right)
     ctx.beginPath();
-    ctx.roundRect(width - 220, 24, 196, 68, 14);
+    ctx.roundRect(width - 240, hudY, 216, 72, 14);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#34d399';
-    ctx.font = 'bold 14px system-ui, sans-serif';
+    ctx.font = 'bold 13.5px system-ui, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(`🌱 ${this.player.seedsCarried} Seeds Carried`, width - 42, 48);
+    ctx.fillText(`🌱 Seeds Carried: ${this.player.seedsCarried}`, width - 42, hudY + 30);
 
-    ctx.fillStyle = '#f8fafc';
-    ctx.font = '600 12px system-ui, sans-serif';
-    ctx.fillText(`💧 ${this.seedsSaved} Seeds Restored`, width - 42, 74);
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '700 12px system-ui, sans-serif';
+    ctx.fillText(`💧 Springs Restored: ${this.forestsRestored} / 3`, width - 42, hudY + 54);
   }
 
   start() {

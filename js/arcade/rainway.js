@@ -95,12 +95,16 @@ export class RainwayGame {
 
   initRoad() {
     this.segments = [];
-    let curY = 0;
     let curCurve = 0;
 
+    // Continuous elevation function — eliminates stair-stepping
+    const getY = (idx) => {
+      return Math.sin(idx / 35) * 1100 + Math.sin(idx / 14) * 450 + Math.cos(idx / 80) * 800;
+    };
+
     for (let i = 0; i < this.totalSegments; i++) {
-      // Hills elevation sinusoidal combination
-      curY = Math.sin(i / 35) * 1100 + Math.sin(i / 14) * 450 + Math.cos(i / 80) * 800;
+      const y1 = getY(i);
+      const y2 = getY(i + 1);
 
       // Curves
       if (i > 80 && i < 220) curCurve = 2.4;
@@ -115,11 +119,11 @@ export class RainwayGame {
       const treeSide = Math.random() < 0.5 ? -1 : 1;
       const treeOffset = 1.4 + Math.random() * 1.6;
 
-      // Scenic VYLT × TERRAPHONE Easter Egg Sign at segment 180 (~900m)
-      const hasSign = (i === 180);
+      // Scenic VYLT × TERRAPHONE Easter Egg Sign at scenic mountain overlook (segment 1150 ~5.7km)
+      const hasSign = (i === 1150);
 
-      // Cloud Ring transformer gate every ~100 segments (rings to pass through)
-      const hasRing = (i % 100 === 0 && i > 50);
+      // Secret airborne Cloud Rings at hill crests
+      const hasRing = (i === 450 || i === 850 || i === 1350);
       if (hasRing) {
         this.cloudRings.push({
           segmentIndex: i,
@@ -130,8 +134,8 @@ export class RainwayGame {
 
       this.segments.push({
         index: i,
-        p1: { world: { y: curY, z: i * this.segmentLength }, screen: {} },
-        p2: { world: { y: curY, z: (i + 1) * this.segmentLength }, screen: {} },
+        p1: { world: { y: y1, z: i * this.segmentLength }, screen: {} },
+        p2: { world: { y: y2, z: (i + 1) * this.segmentLength }, screen: {} },
         curve: curCurve,
         color: Math.floor(i / 3) % 2 ? {
           road: '#1a1f2e',
@@ -405,27 +409,29 @@ export class RainwayGame {
       this.speed = Math.max(0, this.speed - this.braking * 1.8 * dt);
     }
 
-    // Steering
-    const speedFactor = this.speed / this.maxSpeed;
+    // Steering: responsive at low and high speeds
+    const speedFactor = Math.abs(this.speed) / this.maxSpeed;
+    const steerRate = (this.speed === 0 ? 0 : Math.max(0.65, speedFactor)) * 2.5;
+
     if (this.keys.left) {
-      this.playerX -= 1.6 * speedFactor * dt;
-      this.steerAngle = Math.max(-0.25, this.steerAngle - 0.9 * dt);
+      this.playerX -= steerRate * dt;
+      this.steerAngle = Math.max(-0.28, this.steerAngle - 1.2 * dt);
     } else if (this.keys.right) {
-      this.playerX += 1.6 * speedFactor * dt;
-      this.steerAngle = Math.min(0.25, this.steerAngle + 0.9 * dt);
+      this.playerX += steerRate * dt;
+      this.steerAngle = Math.min(0.28, this.steerAngle + 1.2 * dt);
     } else {
-      this.steerAngle *= 0.85;
+      this.steerAngle *= 0.82;
     }
 
-    // Centrifugal curve push
+    // Centrifugal curve push (balanced so turning easily overcomes it)
     const currentSegment = this.findSegment(this.position);
-    this.playerX -= (currentSegment.curve * speedFactor * speedFactor * 0.42) * dt;
+    this.playerX -= (currentSegment.curve * speedFactor * 0.14) * dt;
 
     // Road friction boundary
     if (Math.abs(this.playerX) > 1.0) {
       // Offroad grass deceleration
-      this.speed = Math.max(0, this.speed - 35 * dt);
-      this.playerX = Math.max(-1.8, Math.min(1.8, this.playerX));
+      this.speed = Math.max(0, this.speed - 30 * dt);
+      this.playerX = Math.max(-1.85, Math.min(1.85, this.playerX));
     }
 
     // Advance position
@@ -439,23 +445,25 @@ export class RainwayGame {
       this.updateHudSector();
     }
 
-    // Check Cloud Ring Easter Egg gate
+    // Check Cloud Ring Easter Egg gate (high speed airborne jump or active glider)
     if (currentSegment.hasRing && !currentSegment.ringCollected) {
-      if (Math.abs(this.playerX) < 0.6) {
+      if (this.isGliderMode || this.speed > 48) {
         currentSegment.ringCollected = true;
         this.triggerCloudGlider(!this.isGliderMode);
       }
     }
 
-    // Check VYLT sign milestone
+    // Check VYLT sign milestone: on the scenic turnout shoulder on right side (playerX >= 1.15 && playerX <= 1.85)
     if (currentSegment.hasSign && !this.vyltSignFound) {
-      this.vyltSignFound = true;
-      arcadeTokens.unlockEasterEgg('VYLT × TERRAPHONE Landmark', 10);
-      this.playChimeSound(880, 0.5);
-      const signToast = document.getElementById('rainway-sign-toast');
-      if (signToast) {
-        signToast.classList.add('visible');
-        setTimeout(() => signToast.classList.remove('visible'), 4500);
+      if (this.playerX >= 1.15 && this.playerX <= 1.85) {
+        this.vyltSignFound = true;
+        arcadeTokens.unlockEasterEgg('VYLT × TERRAPHONE Landmark', 10);
+        this.playChimeSound(880, 0.5);
+        const signToast = document.getElementById('rainway-sign-toast');
+        if (signToast) {
+          signToast.classList.add('visible');
+          setTimeout(() => signToast.classList.remove('visible'), 4500);
+        }
       }
     }
 
@@ -590,13 +598,15 @@ export class RainwayGame {
   }
 
   renderSegment(ctx, width, p1, p2, color, rainRate) {
-    // Grass
-    ctx.fillStyle = color.grass;
-    ctx.fillRect(0, p2.y, width, p1.y - p2.y);
-
-    // Rumble strips (curbs)
     const r1 = p1.w / 6;
     const r2 = p2.w / 6;
+
+    // Grass: continuous polygon slopes on left and right sides
+    ctx.fillStyle = color.grass;
+    this.drawPolygon(ctx, 0, p1.y, p1.x - p1.w - r1, p1.y, p2.x - p2.w - r2, p2.y, 0, p2.y);
+    this.drawPolygon(ctx, p1.x + p1.w + r1, p1.y, width, p1.y, width, p2.y, p2.x + p2.w + r2, p2.y);
+
+    // Rumble strips (curbs)
     ctx.fillStyle = color.rumble;
     this.drawPolygon(ctx, p1.x - p1.w - r1, p1.y, p1.x - p1.w, p1.y, p2.x - p2.w, p2.y, p2.x - p2.w - r2, p2.y);
     this.drawPolygon(ctx, p1.x + p1.w, p1.y, p1.x + p1.w + r1, p1.y, p2.x + p2.w + r2, p2.y, p2.x + p2.w, p2.y);
@@ -607,7 +617,7 @@ export class RainwayGame {
 
     // Wet road specular reflection (brighter when rainRate > 0)
     if (rainRate > 0.5) {
-      ctx.fillStyle = `rgba(56, 189, 248, ${Math.min(0.18, rainRate * 0.008)})`;
+      ctx.fillStyle = `rgba(56, 189, 248, ${Math.min(0.22, rainRate * 0.01)})`;
       this.drawPolygon(ctx, p1.x - p1.w, p1.y, p1.x + p1.w, p1.y, p2.x + p2.w, p2.y, p2.x - p2.w, p2.y);
     }
 
@@ -834,49 +844,51 @@ export class RainwayGame {
   }
 
   renderGameHud(ctx, width, height, sector) {
-    // Top-left Sector & NASA GPM IMERG Info Card
-    ctx.fillStyle = 'rgba(10, 15, 26, 0.85)';
+    // Bottom-left Sector & NASA GPM IMERG Info Card
+    ctx.fillStyle = 'rgba(10, 15, 26, 0.88)';
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 1;
 
-    const pillW = 280;
-    const pillH = 68;
+    const pillW = 320;
+    const pillH = 72;
+    const hudY = height - 96;
+
     ctx.beginPath();
-    ctx.roundRect(24, 24, pillW, pillH, 14);
+    ctx.roundRect(24, hudY, pillW, pillH, 14);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#38bdf8';
     ctx.font = 'bold 11px system-ui, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText('🛰️ NASA GPM IMERG REGIONAL PRECIP', 38, 44);
+    ctx.fillText('🛰️ NASA GPM IMERG REGIONAL PRECIP', 38, hudY + 22);
 
     ctx.fillStyle = '#f8fafc';
     ctx.font = 'bold 14px system-ui, sans-serif';
-    ctx.fillText(`${sector.name} · ${sector.rainRate.toFixed(1)} mm/h`, 38, 63);
+    ctx.fillText(`${sector.name} · ${sector.rainRate.toFixed(1)} mm/h`, 38, hudY + 43);
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '10.5px system-ui, sans-serif';
-    ctx.fillText(sector.desc, 38, 79);
+    ctx.fillText(sector.desc, 38, hudY + 60);
 
-    // Top-right Speedometer & Distance
+    // Bottom-right Speedometer & Distance
     const speedKmh = Math.round(Math.abs(this.speed) * 3.6);
     ctx.beginPath();
-    ctx.roundRect(width - 200, 24, 176, pillH, 14);
+    ctx.roundRect(width - 200, hudY, 176, pillH, 14);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#f8fafc';
     ctx.font = '800 24px system-ui, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(`${speedKmh} `, width - 80, 56);
+    ctx.fillText(`${speedKmh} `, width - 80, hudY + 36);
     ctx.font = '600 11px system-ui, sans-serif';
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText('KM/H', width - 42, 56);
+    ctx.fillText('KM/H', width - 42, hudY + 36);
 
     ctx.fillStyle = '#34d399';
     ctx.font = 'bold 12px system-ui, sans-serif';
-    ctx.fillText(`📍 ${this.distanceTraveled} m explored`, width - 42, 78);
+    ctx.fillText(`📍 ${this.distanceTraveled} m explored`, width - 42, hudY + 58);
   }
 
   updateHudSector() {

@@ -12,7 +12,7 @@
 .arcade-view {
   position: fixed;
   inset: 0;
-  z-index: 15;
+  z-index: 45;
   background: #030509;
   display: flex;
   flex-direction: column;
@@ -157,12 +157,78 @@
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-card);
   padding: 20px 24px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
+}
+
+.arcade-vault-hero-card {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(16, 185, 129, 0.08) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-card);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vault-hero-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.vault-coin-badge {
+  font-size: 28px;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vault-hero-title {
+  font-size: 15px;
+  font-weight: 750;
+  color: #fbbf24;
+  margin: 0 0 3px 0;
+}
+
+.vault-hero-subtitle {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin: 0;
+}
+
+.vault-hero-subtitle strong {
+  color: var(--text-main);
+}
+
+.arcade-vault-action-btn {
+  background: #f59e0b;
+  color: #030712;
+  border: none;
+  font-weight: 750;
+  font-size: 12.5px;
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.arcade-vault-action-btn:hover {
+  background: #fbbf24;
+  transform: scale(1.03);
 }
 
 .arcade-hero-banner h3 {
@@ -425,13 +491,107 @@
 .arcade-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
-  background: rgba(3, 5, 10, 0.82);
-  backdrop-filter: blur(12px);
+  z-index: 2000;
+  background: rgba(3, 5, 10, 0.86);
+  backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+}
+
+/* In-game End Mission / Win / Game Over Overlays */
+.arcade-overlay-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 55;
+  background: rgba(3, 7, 18, 0.88);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+  animation: fadeIn 0.3s ease;
+}
+
+.arcade-overlay-box {
+  background: rgba(13, 20, 36, 0.95);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-card);
+  padding: 28px 36px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.arcade-overlay-icon {
+  font-size: 42px;
+}
+
+.arcade-overlay-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin: 0;
+}
+
+.arcade-overlay-desc {
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.arcade-overlay-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fbbf24;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.arcade-overlay-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.arcade-btn-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.arcade-btn-primary:hover {
+  transform: scale(1.04);
+}
+
+.arcade-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-border);
+  color: var(--text-main);
+  padding: 8px 18px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .arcade-modal-dialog {

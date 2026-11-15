@@ -159,6 +159,24 @@ export class ArcadeHub {
             </div>
           </div>
 
+          <!-- Zen Token Vault & Customization Garage Banner -->
+          <div class="arcade-vault-hero-card" id="arcade-vault-hero">
+            <div class="vault-hero-left">
+              <div class="vault-coin-badge">🪙</div>
+              <div>
+                <h3 class="vault-hero-title">Zen Token Vault & Customization Garage</h3>
+                <p class="vault-hero-subtitle">
+                  Balance: <strong id="hero-vault-tokens">${profile.tokens} Tokens</strong> · 
+                  Active Zen: <strong>${profile.zenMinutes} mins</strong> · 
+                  Daily Cap: <strong>${profile.todayZenTokens || 0} / 30 🪙</strong>
+                </p>
+              </div>
+            </div>
+            <button id="arcade-btn-open-garage" class="arcade-vault-action-btn">
+              <span>🚗 Open Cosmetic Garage & Skins →</span>
+            </button>
+          </div>
+
           <!-- Games Cards Grid -->
           <div class="arcade-cards-grid">
             ${ARCADE_GAMES.map(game => {
@@ -313,14 +331,19 @@ export class ArcadeHub {
       }
     });
 
-    // Shop modal
+    // Shop modal triggers
     const shopModal = document.getElementById('arcade-shop-modal');
-    document.getElementById('arcade-btn-shop')?.addEventListener('click', () => {
+    const openShop = () => {
       this.updateShopModal();
-      shopModal.style.display = 'flex';
-    });
+      if (shopModal) shopModal.style.display = 'flex';
+    };
+
+    document.getElementById('arcade-btn-shop')?.addEventListener('click', openShop);
+    document.getElementById('arcade-btn-open-garage')?.addEventListener('click', openShop);
+    document.getElementById('btn-token-shop')?.addEventListener('click', openShop);
+
     document.getElementById('arcade-btn-close-shop')?.addEventListener('click', () => {
-      shopModal.style.display = 'none';
+      if (shopModal) shopModal.style.display = 'none';
     });
     shopModal?.addEventListener('click', (e) => {
       if (e.target === shopModal) shopModal.style.display = 'none';
@@ -336,8 +359,13 @@ export class ArcadeHub {
     if (!this._tokenListenerAttached) {
       window.addEventListener('terraphone_arcade_token_event', () => {
         const countEl = document.getElementById('arcade-token-count');
+        const hudCount = document.getElementById('hud-token-count');
+        const heroTokens = document.getElementById('hero-vault-tokens');
         const modalBal = document.getElementById('modal-token-balance');
-        if (countEl) countEl.textContent = `${arcadeTokens.profile.tokens} Tokens`;
+        const tokensText = `${arcadeTokens.profile.tokens} Tokens`;
+        if (countEl) countEl.textContent = tokensText;
+        if (hudCount) hudCount.textContent = tokensText;
+        if (heroTokens) heroTokens.textContent = tokensText;
         if (modalBal) modalBal.textContent = `${arcadeTokens.profile.tokens} 🪙`;
       });
       this._tokenListenerAttached = true;
@@ -404,6 +432,12 @@ export class ArcadeHub {
     if (!this.audioCtx && window.app?.sound?.ctx) {
       this.audioCtx = window.app.sound.ctx;
     }
+
+    // Hide global HUD capsules during gameplay to avoid any overlap
+    const hudLeft = document.getElementById('hud-top-left');
+    const hudRight = document.getElementById('hud-top-right');
+    if (hudLeft) hudLeft.style.display = 'none';
+    if (hudRight) hudRight.style.display = 'none';
 
     const hubEl = document.getElementById('arcade-hub-content');
     const viewportEl = document.getElementById('arcade-game-viewport');
@@ -473,6 +507,12 @@ export class ArcadeHub {
     const viewportEl = document.getElementById('arcade-game-viewport');
     const pauseBtn = document.getElementById('arcade-btn-pause-game');
     if (pauseBtn) pauseBtn.innerHTML = '<span>⏸️ Pause</span>';
+
+    // Restore global HUD capsules
+    const hudLeft = document.getElementById('hud-top-left');
+    const hudRight = document.getElementById('hud-top-right');
+    if (hudLeft) hudLeft.style.display = '';
+    if (hudRight) hudRight.style.display = '';
 
     if (hubEl) hubEl.style.display = 'block';
     if (viewportEl) viewportEl.style.display = 'none';

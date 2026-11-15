@@ -1756,6 +1756,10 @@ class App {
     const arcadeContainer = document.getElementById('arcade-view');
     if (!arcadeContainer) return;
     this.arcade = new ArcadeHub(arcadeContainer, this.sound.ctx);
+    const hudTokens = document.getElementById('hud-token-count');
+    if (hudTokens) {
+      hudTokens.textContent = `${arcadeTokens.profile.tokens} Tokens`;
+    }
   }
 
   // ==========================================

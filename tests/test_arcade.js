@@ -225,7 +225,7 @@ async function runArcadeTests() {
 
   const rainway = new RainwayGame(mockCanvas, mockAudio, () => { exitedRainway = true; });
   assert.strictEqual(rainway.segments.length > 500, true, 'Rainway should generate procedural road segments');
-  assert.strictEqual(rainway.cloudRings.length > 5, true, 'Rainway should place secret cloud glider rings');
+  assert.strictEqual(rainway.cloudRings.length >= 3, true, 'Rainway should place secret cloud glider rings');
 
   rainway.start();
   assert.strictEqual(rainway.isRunning, true, 'Rainway should be running');
@@ -296,7 +296,7 @@ async function runArcadeTests() {
   heat.start();
   heat.keys.up = true;
   heat.update(0.1);
-  assert.strictEqual(heat.cityBlocks.length > 20, true, 'Heat Escape should have ECOSTRESS city blocks');
+  assert.strictEqual(heat.cityAvenues.length > 20, true, 'Heat Escape should have ECOSTRESS city blocks');
   heat.pause();
   assert.strictEqual(heat.isPaused, true, 'Heat Escape should pause');
   heat.stop();
@@ -306,7 +306,7 @@ async function runArcadeTests() {
   const water = new WaterKeeperGame(mockCanvas, mockAudio, () => {});
   water.start();
   water.update(0.1);
-  assert.strictEqual(water.terrain.length > 10, true, 'Water Keeper should have SMAP soil moisture terrain');
+  assert.strictEqual(water.getTerrainAt(200).y > 0, true, 'Water Keeper should have SMAP soil moisture terrain');
   water.pause();
   assert.strictEqual(water.isPaused, true, 'Water Keeper should pause');
   water.stop();
@@ -316,7 +316,7 @@ async function runArcadeTests() {
   const cloud = new CloudCourierGame(mockCanvas, mockAudio, () => {});
   cloud.start();
   cloud.update(0.016);
-  assert.strictEqual(cloud.pollutionPlumes.length > 10, true, 'Cloud Courier should have OMI SO2/NO2 plumes');
+  assert.strictEqual(cloud.smokestackGates.length > 10, true, 'Cloud Courier should have OMI SO2/NO2 plumes');
   cloud.pause();
   assert.strictEqual(cloud.isPaused, true, 'Cloud Courier should pause');
   cloud.stop();
@@ -346,7 +346,7 @@ async function runArcadeTests() {
   const forest = new LastForestGame(mockCanvas, mockAudio, () => {});
   forest.start();
   forest.update(0.016);
-  assert.strictEqual(forest.trees.length > 20, true, 'Last Forest should have Landsat canopy trees');
+  assert.strictEqual(forest.canopyLayers.length > 20, true, 'Last Forest should have Landsat canopy trees');
   forest.pause();
   assert.strictEqual(forest.isPaused, true, 'Last Forest should pause');
   forest.stop();
